@@ -1,13 +1,3 @@
-#include <Arduino.h>
-
-void setup() {
-  // put your setup code here, to run once:
-}
-
-void loop() {
-  // put your main code here, to run repeatedly:
-}
-
 /*
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/?s=esp-now
@@ -15,7 +5,7 @@ void loop() {
   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
   Based on JC Servaye example: https://github.com/Servayejc/esp_now_web_server/
 */
-
+#include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
 #include "ESPAsyncWebServer.h"
@@ -131,10 +121,10 @@ if (!!window.EventSource) {
 
 void readDataToSend() {
   outgoingSetpoints.msgType = DATA;
-  outgoingSetpoints.id = 0;
+  outgoingSetpoints.id = 0; // Servidor te la id 0, els esclaus la 1,2,3..
   outgoingSetpoints.temp = random(0, 40);
   outgoingSetpoints.hum = random(0, 100);
-  outgoingSetpoints.readingId = counter++;
+  outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
 }
 
 
@@ -146,7 +136,7 @@ void printMAC(const uint8_t * mac_addr){
   Serial.print(macStr);
 }
 
-bool addPeer(const uint8_t *peer_addr) {      // add pairing
+bool addPeer(const uint8_t *peer_addr) {      // add pairing Funció per afgir Peers
   memset(&slave, 0, sizeof(slave));
   const esp_now_peer_info_t *peer = &slave;
   memcpy(slave.peer_addr, peer_addr, 6);
@@ -214,14 +204,14 @@ void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) 
     printMAC(mac_addr);
     Serial.println();
     Serial.println(pairingData.channel);
-    if (pairingData.id > 0) {     // do not replay to server itself
+    if (pairingData.id > 0) {     // do not replay to server itself (No es respon a ell mateix)
       if (pairingData.msgType == PAIRING) { 
         pairingData.id = 0;       // 0 is server
         // Server is in AP_STA mode: peers need to send data to server soft AP MAC address 
         WiFi.softAPmacAddress(pairingData.macAddr);   
         pairingData.channel = chan;
         Serial.println("send response");
-        esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
+        esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData)); // Respon al emissor
         addPeer(mac_addr);
       }  
     }  
@@ -250,6 +240,8 @@ void setup() {
   // Set the device as a Station and Soft Access Point simultaneously
   WiFi.mode(WIFI_AP_STA);
   // Set device as a Wi-Fi Station
+  // Haurem de veure que passa si no te una connexió wifi
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -265,7 +257,7 @@ void setup() {
   Serial.print("Wi-Fi Channel: ");
   Serial.println(WiFi.channel());
 
-  initESP_NOW();
+  initESP_NOW(); // Iniciem el EspNow
   
   // Start Web server
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -291,7 +283,8 @@ void setup() {
 
 void loop() {
   static unsigned long lastEventTime = millis();
-  static const unsigned long EVENT_INTERVAL_MS = 5000;
+  static const unsigned long EVENT_INTERVAL_MS = 5000; //Envia cada 5 segons informació
+  // Cal canviar el loop per fer-lo quan es rebi un GPIO
   if ((millis() - lastEventTime) > EVENT_INTERVAL_MS) {
     events.send("ping",NULL,millis());
     lastEventTime = millis();
