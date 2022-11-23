@@ -1,4 +1,13 @@
+/* 
+ TALLY MASTER 
+ 
+ Firmware per gestionar un sistema de Tally's inhalambrics.
+
+ */
+
 /*
+  Basat en:
+
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/?s=esp-now
   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
@@ -15,11 +24,12 @@
 // Replace with your network credentials (STATION)
 const char* ssid = "exteriors";
 const char* password = "exteriors";
+// TODO: Poder seleccionar via WEB la Wifi on connectar.
 
 esp_now_peer_info_t slave;
 int chan; 
 
-enum MessageType {PAIRING, DATA,};
+enum MessageType {PAIRING, DATA, TALLY, BATERIA, CLOCK};
 MessageType messageType;
 
 int counter = 0;
@@ -34,12 +44,39 @@ typedef struct struct_message {
   unsigned int readingId;
 } struct_message;
 
+// Estructura pairing
 typedef struct struct_pairing {       // new structure for pairing
     uint8_t msgType;
     uint8_t id;
     uint8_t macAddr[6];
     uint8_t channel;
 } struct_pairing;
+
+// Estrucrtura dades per enviar a slaves
+typedef struct struct_message_to_slave {
+  uint8_t msgType;
+  uint8_t funcio; // Identificador de la funcio del tally
+  bool led_roig; // llum confirmació cond polsador vermell
+  bool led_verd;    // llum confirmació cond polsador verd
+  uint8_t color_tally; // Color indexat del tally
+  // text per mostrar a pantalla
+} struct_message;
+
+// Estrucrtura dades rebuda de slaves
+typedef struct struct_message_from_slave {
+  uint8_t msgType;
+  uint8_t id;     // Identificador del tally
+  uint8_t funcio; // Identificador de la funcio del tally
+  bool boto_vermell;
+  bool boto_verd;
+} struct_message;
+
+// Estructura dades per rebre bateries
+// TODO
+// uint16_t battery;
+
+// Estructura dades per rebre clock
+// TODO
 
 struct_message incomingReadings;
 struct_message outgoingSetpoints;
