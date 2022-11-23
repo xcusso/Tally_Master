@@ -13,8 +13,8 @@
 #include <ArduinoJson.h>
 
 // Replace with your network credentials (STATION)
-const char* ssid = "REPLACE_WITH_YOUR_SSID";
-const char* password = "REPLACE_WITH_YOUR_PASSWORD";
+const char* ssid = "exteriors";
+const char* password = "exteriors";
 
 esp_now_peer_info_t slave;
 int chan; 
