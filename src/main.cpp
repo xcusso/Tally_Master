@@ -1,6 +1,6 @@
-/* 
- TALLY MASTER 
- 
+/*
+ TALLY MASTER
+
  Firmware per gestionar un sistema de Tally's inhalambrics.
 
  */
@@ -22,21 +22,38 @@
 #include <ArduinoJson.h>
 
 // Replace with your network credentials (STATION)
-const char* ssid = "exteriors";
-const char* password = "exteriors";
+const char *ssid = "exteriors";
+const char *password = "exteriors";
 // TODO: Poder seleccionar via WEB la Wifi on connectar.
 
 esp_now_peer_info_t slave;
-int chan; 
+int chan;
 
-enum MessageType {PAIRING, DATA, TALLY, BATERIA, CLOCK};
+enum MessageType
+{
+  PAIRING,
+  DATA,
+  TALLY,
+  BATERIA,
+  CLOCK
+};
 MessageType messageType;
+
+// Definim les funcions del Tally
+enum TipusFuncio
+{
+  LLUM,
+  CONDUCTOR,
+  PRODUCTOR
+};
+TipusFuncio Funcio = LLUM; 
 
 int counter = 0;
 
 // Structure example to receive data
 // Must match the sender structure
-typedef struct struct_message {
+typedef struct struct_message
+{
   uint8_t msgType;
   uint8_t id;
   float temp;
@@ -45,35 +62,44 @@ typedef struct struct_message {
 } struct_message;
 
 // Estructura pairing
-typedef struct struct_pairing {       // new structure for pairing
-    uint8_t msgType;
-    uint8_t id;
-    uint8_t macAddr[6];
-    uint8_t channel;
+typedef struct struct_pairing
+{ // new structure for pairing
+  uint8_t msgType;
+  uint8_t id;
+  uint8_t macAddr[6];
+  uint8_t channel;
 } struct_pairing;
 
 // Estrucrtura dades per enviar a slaves
-typedef struct struct_message_to_slave {
+typedef struct struct_message_to_slave
+{
   uint8_t msgType;
-  uint8_t funcio; // Identificador de la funcio del tally
-  bool led_roig; // llum confirmació cond polsador vermell
-  bool led_verd;    // llum confirmació cond polsador verd
+  uint8_t funcio;      // Identificador de la funcio del tally
+  bool led_roig;       // llum confirmació cond polsador vermell
+  bool led_verd;       // llum confirmació cond polsador verd
   uint8_t color_tally; // Color indexat del tally
   // text per mostrar a pantalla
 } struct_message;
 
 // Estrucrtura dades rebuda de slaves
-typedef struct struct_message_from_slave {
+typedef struct struct_message_from_slave
+{
   uint8_t msgType;
   uint8_t id;     // Identificador del tally
   uint8_t funcio; // Identificador de la funcio del tally
-  bool boto_vermell;
+  bool boto_roig;
   bool boto_verd;
 } struct_message;
 
 // Estructura dades per rebre bateries
-// TODO
-// uint16_t battery;
+typedef struct struct_bateria_info
+{
+  uint8_t msgType;
+  uint8_t id;             // Identificador del tally
+  float volts;            // Lectura en volts
+  float percent;          // Percentatge carrega
+  unsigned int readingId; // Identificador de lectura
+} struct_message;
 
 // Estructura dades per rebre clock
 // TODO
@@ -156,7 +182,8 @@ if (!!window.EventSource) {
 </body>
 </html>)rawliteral";
 
-void readDataToSend() {
+void readDataToSend()
+{
   outgoingSetpoints.msgType = DATA;
   outgoingSetpoints.id = 0; // Servidor te la id 0, els esclaus la 1,2,3..
   outgoingSetpoints.temp = random(0, 40);
@@ -164,62 +191,69 @@ void readDataToSend() {
   outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
 }
 
-
 // ---------------------------- esp_ now -------------------------
-void printMAC(const uint8_t * mac_addr){
+void printMAC(const uint8_t *mac_addr)
+{
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
   Serial.print(macStr);
 }
 
-bool addPeer(const uint8_t *peer_addr) {      // add pairing Funció per afgir Peers
+bool addPeer(const uint8_t *peer_addr)
+{ // add pairing Funció per afgir Peers
   memset(&slave, 0, sizeof(slave));
   const esp_now_peer_info_t *peer = &slave;
   memcpy(slave.peer_addr, peer_addr, 6);
-  
+
   slave.channel = chan; // pick a channel
-  slave.encrypt = 0; // no encryption
+  slave.encrypt = 0;    // no encryption
   // check if the peer exists
   bool exists = esp_now_is_peer_exist(slave.peer_addr);
-  if (exists) {
+  if (exists)
+  {
     // Slave already paired.
     Serial.println("Already Paired");
     return true;
   }
-  else {
+  else
+  {
     esp_err_t addStatus = esp_now_add_peer(peer);
-    if (addStatus == ESP_OK) {
+    if (addStatus == ESP_OK)
+    {
       // Pair success
       Serial.println("Pair success");
       return true;
     }
-    else 
+    else
     {
       Serial.println("Pair failed");
       return false;
     }
   }
-} 
+}
 
 // callback when data is sent
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
+{
   Serial.print("Last Packet Send Status: ");
   Serial.print(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success to " : "Delivery Fail to ");
   printMAC(mac_addr);
   Serial.println();
 }
 
-void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) { 
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
+{
   Serial.print(len);
   Serial.print(" bytes of data received from : ");
   printMAC(mac_addr);
   Serial.println();
   StaticJsonDocument<1000> root;
   String payload;
-  uint8_t type = incomingData[0];       // first message byte is the type of message 
-  switch (type) {
-  case DATA :                           // the message is data type
+  uint8_t type = incomingData[0]; // first message byte is the type of message
+  switch (type)
+  {
+  case DATA: // the message is data type
     memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
     // create a JSON document with received data and send it by event to the web page
     root["id"] = incomingReadings.id;
@@ -232,8 +266,8 @@ void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) 
     events.send(payload.c_str(), "new_readings", millis());
     Serial.println();
     break;
-  
-  case PAIRING:                            // the message is a pairing request 
+
+  case PAIRING: // the message is a pairing request
     memcpy(&pairingData, incomingData, sizeof(pairingData));
     Serial.println(pairingData.msgType);
     Serial.println(pairingData.id);
@@ -241,32 +275,37 @@ void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) 
     printMAC(mac_addr);
     Serial.println();
     Serial.println(pairingData.channel);
-    if (pairingData.id > 0) {     // do not replay to server itself (No es respon a ell mateix)
-      if (pairingData.msgType == PAIRING) { 
-        pairingData.id = 0;       // 0 is server
-        // Server is in AP_STA mode: peers need to send data to server soft AP MAC address 
-        WiFi.softAPmacAddress(pairingData.macAddr);   
+    if (pairingData.id > 0)
+    { // do not replay to server itself (No es respon a ell mateix)
+      if (pairingData.msgType == PAIRING)
+      {
+        pairingData.id = 0; // 0 is server
+        // Server is in AP_STA mode: peers need to send data to server soft AP MAC address
+        WiFi.softAPmacAddress(pairingData.macAddr);
         pairingData.channel = chan;
         Serial.println("send response");
-        esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData)); // Respon al emissor
+        esp_err_t result = esp_now_send(mac_addr, (uint8_t *)&pairingData, sizeof(pairingData)); // Respon al emissor
         addPeer(mac_addr);
-      }  
-    }  
-    break; 
+      }
+    }
+    break;
   }
 }
 
-void initESP_NOW(){
-    // Init ESP-NOW
-    if (esp_now_init() != ESP_OK) {
-      Serial.println("Error initializing ESP-NOW");
-      return;
-    }
-    esp_now_register_send_cb(OnDataSent);
-    esp_now_register_recv_cb(OnDataRecv);
-} 
+void initESP_NOW()
+{
+  // Init ESP-NOW
+  if (esp_now_init() != ESP_OK)
+  {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  esp_now_register_send_cb(OnDataSent);
+  esp_now_register_recv_cb(OnDataRecv);
+}
 
-void setup() {
+void setup()
+{
   // Initialize Serial Monitor
   Serial.begin(115200);
 
@@ -280,7 +319,8 @@ void setup() {
   // Haurem de veure que passa si no te una connexió wifi
 
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(1000);
     Serial.println("Setting as a Wi-Fi Station..");
   }
@@ -295,37 +335,36 @@ void setup() {
   Serial.println(WiFi.channel());
 
   initESP_NOW(); // Iniciem el EspNow
-  
-  // Start Web server
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
-  
 
-  // Events 
-  events.onConnect([](AsyncEventSourceClient *client){
+  // Start Web server
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html); });
+
+  // Events
+  events.onConnect([](AsyncEventSourceClient *client)
+                   {
     if(client->lastId()){
       Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000);
-  });
+    client->send("hello!", NULL, millis(), 10000); });
   server.addHandler(&events);
-  
+
   // start server
   server.begin();
-
 }
 
-void loop() {
+void loop()
+{
   static unsigned long lastEventTime = millis();
-  static const unsigned long EVENT_INTERVAL_MS = 5000; //Envia cada 5 segons informació
+  static const unsigned long EVENT_INTERVAL_MS = 5000; // Envia cada 5 segons informació
   // Cal canviar el loop per fer-lo quan es rebi un GPIO
-  if ((millis() - lastEventTime) > EVENT_INTERVAL_MS) {
-    events.send("ping",NULL,millis());
+  if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
+  {
+    events.send("ping", NULL, millis());
     lastEventTime = millis();
     readDataToSend();
-    esp_now_send(NULL, (uint8_t *) &outgoingSetpoints, sizeof(outgoingSetpoints));
+    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints));
   }
 }
