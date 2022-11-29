@@ -4,13 +4,13 @@
  Firmware per gestionar un sistema de Tally's inhalambrics.
 
  */
-/* 
+/*
 TODO
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
 Fer menu selecció funció local
-Implentar Display 
+Implentar Display
 Implentar hora
 Implentar mostrar texte
 Lectura valors reals bateria
@@ -109,7 +109,7 @@ enum TipusFuncio
   CONDUCTOR,
   PRODUCTOR
 };
-TipusFuncio Funcio = LLUM; 
+TipusFuncio Funcio = LLUM;
 
 int counter = 0;
 
@@ -173,11 +173,10 @@ struct_message incomingReadings;
 struct_message outgoingSetpoints;
 struct_pairing pairingData;
 struct_message_from_slave fromSlave; // dades del master cap al tally
-struct_message_to_slave toSlave;  // dades del tally cap al master
+struct_message_to_slave toSlave;     // dades del tally cap al master
 
 AsyncWebServer server(80);
 AsyncEventSource events("/events");
-
 
 // TODO: Adaptar web als valors dels Tallys
 const char index_html[] PROGMEM = R"rawliteral(
@@ -258,6 +257,82 @@ void readDataToSend()
   outgoingSetpoints.temp = random(0, 40);
   outgoingSetpoints.hum = random(0, 100);
   outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
+}
+
+// Simulem lectura de bateria
+// TODO Unificar lectura volts i convertir a nivells
+float readBateriaVolts()
+{
+  volt = random(0, 40); // = analogRead(BATTERY_PIN)
+  return volt;
+}
+
+// Simulem lectura percentatge bateria
+float readBateriaPercent()
+{
+  percent = random(0, 100);
+  return percent;
+}
+
+// Posar llum a un color
+void escriure_matrix(uint8_t color)
+{
+  // GBR
+  uint8_t G = COLOR[color][1];
+  uint8_t B = COLOR[color][2];
+  uint8_t R = COLOR[color][0];
+  for (int i = 0; i < LED_COUNT; i++)
+  {
+    llum.setPixelColor(i, llum.Color(G, B, R));
+  }
+  llum.show();
+  if (debug)
+  {
+    Serial.print("Color: ");
+    Serial.println(color);
+    Serial.print("R: ");
+    Serial.println(R);
+    Serial.print("G: ");
+    Serial.println(G);
+    Serial.print("B: ");
+    Serial.println(B);
+  }
+}
+
+void llegir_botons()
+{
+  BOTO_LOCAL_ROIG[1] = !digitalRead(BOTO_ROIG_PIN); // Els botons son PULLUP per tant els llegirem al revés
+  BOTO_LOCAL_VERD[1] = !digitalRead(BOTO_VERD_PIN);
+  // Detecció canvi de botons locals
+  if (BOTO_LOCAL_ROIG[0] != BOTO_LOCAL_ROIG[1])
+  {
+    /// HEM POLSAT EL BOTO ROIG
+    LOCAL_CHANGE = true;
+    BOTO_LOCAL_ROIG[0] = BOTO_LOCAL_ROIG[1];
+    if (debug)
+    {
+      Serial.print("Boto local ROIG: ");
+      Serial.println(BOTO_LOCAL_ROIG[0]);
+    }
+  }
+
+  if (BOTO_LOCAL_VERD[0] != BOTO_LOCAL_VERD[1])
+  {
+    /// HEM POLSAT EL BOTO VERD
+    LOCAL_CHANGE = true;
+    BOTO_LOCAL_VERD[0] = BOTO_LOCAL_VERD[1];
+    if (debug)
+    {
+      Serial.print("Boto local VERD: ");
+      Serial.println(BOTO_LOCAL_VERD[0]);
+    }
+  }
+}
+
+void escriure_leds()
+{
+  digitalWrite(LED_ROIG_PIN, LED_LOCAL_ROIG);
+  digitalWrite(LED_VERD_PIN, LED_LOCAL_VERD);
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -399,79 +474,137 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
   }
 }
 
-    void initESP_NOW()
+void Menu_configuracio()
+{
+  // Desenvolupar aqui el mode configuració
+  // TODO:  Seleccionar entre LLUM, CONDUCTOR i PRODUCTOR
+  // Veure com generem menu
+  /*
+  Si opcio 1
+    funcio_local = LLUM;
+  Si opció 2
+    funcio_local = CONDUCTOR;
+  Si opcio 3
+    funcio_local = PRODUCTOR;
+  */
+  // Comunicar nova funció
+}
+
+void detectar_mode_configuracio()
+{
+  if (LOCAL_CHANGE)
+  {
+    if (BOTO_LOCAL_ROIG[0] && BOTO_LOCAL_VERD[0] && !pre_mode_configuracio)
     {
-      // Init ESP-NOW
-      if (esp_now_init() != ESP_OK)
+      // Tenim els dos polsadors apretats i no estem en pre_mode_configuracio
+      // Entrarem al mode CONFIG
+      temps_set_config = millis();  // Llegim el temps actual per entrar a mode config
+      pre_mode_configuracio = true; // Situem el flag en pre-mode-confi
+      if (debug)
       {
-        Serial.println("Error initializing ESP-NOW");
-        return;
+        Serial.print("PRE CONFIGURACIO MODE");
       }
-      esp_now_register_send_cb(OnDataSent);
-      esp_now_register_recv_cb(OnDataRecv);
     }
 
-    void setup()
-    {
-      // Initialize Serial Monitor
-      Serial.begin(115200);
-
-      Serial.println();
-      Serial.print("Server MAC Address:  ");
-      Serial.println(WiFi.macAddress());
-
-      // Set the device as a Station and Soft Access Point simultaneously
-      WiFi.mode(WIFI_AP_STA);
-      // Set device as a Wi-Fi Station
-      // Haurem de veure que passa si no te una connexió wifi
-
-      WiFi.begin(ssid, password);
-      while (WiFi.status() != WL_CONNECTED)
-      {
-        delay(1000);
-        Serial.println("Setting as a Wi-Fi Station..");
+    if ((!BOTO_LOCAL_ROIG[0] || !BOTO_LOCAL_VERD[0]) && pre_mode_configuracio)
+    { // Si deixem de pulsar botons i estavem en pre_mode_de_configuracio
+      if ((millis()) >= (temps_config + temps_set_config))
+      {                                // Si ha pasat el temps d'activació
+        mode_configuracio = true;      // Entrem en mode configuracio
+        pre_mode_configuracio = false; // Sortim del mode preconfiguracio
+        if (debug)
+        {
+          Serial.print("CONFIGURACIO MODE");
+        }
+        // TODO: Cridar mode config
+        Menu_configuracio();
       }
+      else
+      {
+        pre_mode_configuracio = false; // Cancelem la preconfiguracio
+        mode_configuracio = false;     // Cancelem la configuracio
+        if (debug)
+        {
+          Serial.print("CANCELEM CONFIGURACIO MODE");
+        }
+      }
+    }
+  }
+}
 
-      Serial.print("Server SOFT AP MAC Address:  ");
-      Serial.println(WiFi.softAPmacAddress());
+void initESP_NOW()
+{
+  // Init ESP-NOW
+  if (esp_now_init() != ESP_OK)
+  {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  esp_now_register_send_cb(OnDataSent);
+  esp_now_register_recv_cb(OnDataRecv);
+}
 
-      chan = WiFi.channel();
-      Serial.print("Station IP Address: ");
-      Serial.println(WiFi.localIP());
-      Serial.print("Wi-Fi Channel: ");
-      Serial.println(WiFi.channel());
+void setup()
+{
+  // Initialize Serial Monitor
+  Serial.begin(115200);
 
-      initESP_NOW(); // Iniciem el EspNow
+  Serial.println();
+  Serial.print("Server MAC Address:  ");
+  Serial.println(WiFi.macAddress());
 
-      // Start Web server
-      server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-                { request->send_P(200, "text/html", index_html); });
+  // Set the device as a Station and Soft Access Point simultaneously
+  WiFi.mode(WIFI_AP_STA);
+  // Set device as a Wi-Fi Station
+  // Haurem de veure que passa si no te una connexió wifi
 
-      // Events
-      events.onConnect([](AsyncEventSourceClient *client)
-                       {
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(1000);
+    Serial.println("Setting as a Wi-Fi Station..");
+  }
+
+  Serial.print("Server SOFT AP MAC Address:  ");
+  Serial.println(WiFi.softAPmacAddress());
+
+  chan = WiFi.channel();
+  Serial.print("Station IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Wi-Fi Channel: ");
+  Serial.println(WiFi.channel());
+
+  initESP_NOW(); // Iniciem el EspNow
+
+  // Start Web server
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html); });
+
+  // Events
+  events.onConnect([](AsyncEventSourceClient *client)
+                   {
     if(client->lastId()){
       Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
     client->send("hello!", NULL, millis(), 10000); });
-      server.addHandler(&events);
+  server.addHandler(&events);
 
-      // start server
-      server.begin();
-    }
+  // start server
+  server.begin();
+}
 
-    void loop()
-    {
-      static unsigned long lastEventTime = millis();
-      static const unsigned long EVENT_INTERVAL_MS = 5000; // Envia cada 5 segons informació
-      // Cal canviar el loop per fer-lo quan es rebi un GPIO
-      if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
-      {
-        events.send("ping", NULL, millis());
-        lastEventTime = millis();
-        readDataToSend();
-        esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints));
-      }
-    }
+void loop()
+{
+  static unsigned long lastEventTime = millis();
+  static const unsigned long EVENT_INTERVAL_MS = 5000; // Envia cada 5 segons informació
+  // Cal canviar el loop per fer-lo quan es rebi un GPIO
+  if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
+  {
+    events.send("ping", NULL, millis());
+    lastEventTime = millis();
+    readDataToSend();
+    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints));
+  }
+}
