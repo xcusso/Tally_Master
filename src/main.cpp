@@ -38,6 +38,9 @@ Lectura valors reals bateria
 // Bool per veure missatges de debug
 bool debug = true;
 
+// Set your Board and Server ID
+#define BOARD_ID 0 // Cal definir cada placa amb el seu numero
+
 // TODO FALTEN DEFINES X PINS GIPO
 // Define PINS
 // Botons i leds locals
@@ -52,6 +55,27 @@ bool debug = true;
 
 // Define sensor battery
 #define BATTERY_PIN 36
+
+// Definim PINS 
+
+// ******** EQUIP A
+// VIA 
+// I Input O Output
+// Només son 4 i no hi ha tensió
+// TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
+const uint8_t GPIA_PIN[4] = {2, 15, 19, 0}; // El bit 1 encen el led local del ESp32 - Atenció 0 Pullup!!!
+const uint8_t GPOA_PIN[1] = {23};           // No tenim tants bits - Un sol bit de confirmacio
+// El bit de confirmació pot obrir canal de la taula
+
+// ******** EQUIP B
+// YAMAHA QL 
+// I Input O Output
+// 5 Ins 5 Outs
+// TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
+uint8_t const GPIB_PIN[6] = {39, 34, 35, 32, 33, 25};
+//uint8_t const GPOB_PIN[5] = {26, 27, 14, 12, 13};
+uint8_t const GPOB_PIN[5] = {26, 27, 17, 16, 13}; //El 12 donava problemes al fer boot, el 14 treu PWM
+
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -75,6 +99,7 @@ bool BOTO_LOCAL_VERD[] = {false, false};
 // Valor dels leds (dels polsadors)
 bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
+uint16_t BATTERY_LOCAL_READ[] = {0, 0};
 
 // Variables de gestió
 bool LOCAL_CHANGE = false; // Per saber si alguna cosa local ha canviat
@@ -109,7 +134,7 @@ enum TipusFuncio
   CONDUCTOR,
   PRODUCTOR
 };
-TipusFuncio Funcio = LLUM;
+TipusFuncio funcio_local = LLUM;
 
 int counter = 0;
 
