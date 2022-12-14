@@ -32,8 +32,9 @@ Lectura valors reals bateria
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h> //Control neopixels
+#include "PC8757.h"            //Expansió I2C GPIO
 
-#define VERSIO M1 // Versió del software
+#define VERSIO "M1" // Versió del software
 
 // Bool per veure missatges de debug
 bool debug = true;
@@ -41,7 +42,16 @@ bool debug = true;
 // Set your Board and Server ID
 #define BOARD_ID 0 // Cal definir cada placa amb el seu numero
 
-// TODO FALTEN DEFINES X PINS GIPO
+// Definim equips externs
+// TODO: En el menú de coniguració he de poder configurar quin equip tinc conectat a cada port
+
+// TODO: Autodetecció equip: 
+// Si Input6(bit 5)= ON -> QL 
+// Si Input 4(bit 3) = ON i INPUT6(bit 5) = OFF -> VIA
+
+#define PORT_A "VIA"
+#define PORT_B "QL"
+
 // Define PINS
 // Botons i leds locals
 #define BOTO_ROIG_PIN 16
@@ -56,26 +66,37 @@ bool debug = true;
 // Define sensor battery
 #define BATTERY_PIN 36
 
-// Definim PINS 
+// Definim PINS
+
+// Amb la redifinicio dels PINS hem d'utilitzar una placa
+// PCF8575 que la conectarem via I2C
+// Els pins SCL 22 i SDA 23
+// Referencia: https://www.prometec.net/mas-entradas-y-salidas-disponibles-esp32/
+// Treballarem amb dos moduls, d'aquesta manera gestionem 16+16 = 32 GPIO extres
+// Definim un GPEXTA i un GPEXTB (cal canviar la direcció de del GPEXTB soldant A0 a VDD)
+PCF8575 GPEXTA(0x20);
+PCF8575 GPEXTB(0x21);
+
+/* AQUESTS PINS NO S'UTILITZEN
 
 // ******** EQUIP A
-// VIA 
+// VIA
 // I Input O Output
 // Només son 4 i no hi ha tensió
 // TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
-const uint8_t GPIA_PIN[4] = {2, 15, 19, 0}; // El bit 1 encen el led local del ESp32 - Atenció 0 Pullup!!!
-const uint8_t GPOA_PIN[1] = {23};           // No tenim tants bits - Un sol bit de confirmacio
+// const uint8_t GPIA_PIN[4] = {2, 15, 19, 0}; // El bit 1 encen el led local del ESp32 - Atenció 0 Pullup!!!
+// const uint8_t GPOA_PIN[1] = {23};           // No tenim tants bits - Un sol bit de confirmacio
 // El bit de confirmació pot obrir canal de la taula
 
 // ******** EQUIP B
-// YAMAHA QL 
+// YAMAHA QL
 // I Input O Output
 // 5 Ins 5 Outs
 // TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
-uint8_t const GPIB_PIN[6] = {39, 34, 35, 32, 33, 25};
-//uint8_t const GPOB_PIN[5] = {26, 27, 14, 12, 13};
-uint8_t const GPOB_PIN[5] = {26, 27, 17, 16, 13}; //El 12 donava problemes al fer boot, el 14 treu PWM
-
+// uint8_t const GPIB_PIN[6] = {39, 34, 35, 32, 33, 25};
+// uint8_t const GPOB_PIN[5] = {26, 27, 14, 12, 13};
+// uint8_t const GPOB_PIN[5] = {26, 27, 17, 16, 13}; // El 12 donava problemes al fer boot, el 14 treu PWM
+*/
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -101,7 +122,20 @@ bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
 uint16_t BATTERY_LOCAL_READ[] = {0, 0};
 
+// Variables GPIO
+// Fem arrays de dos valors. El primer valor 0 és anterior la 1 actual
+// El segon valor es el PIN 0 = 1, 1=2..
+// Els GPIx tenen dos valors per veure si han canviat.
+bool GPIA[2][8] = {{false, false, false, false, false, false, false, false},
+                   {false, false, false, false, false, false, false, false}}; // GPI que venen del equip A INPUTS
+bool GPIB[2][8] = {{false, false, false, false, false, false, false, false},
+                   {false, false, false, false, false, false, false, false}}; // GPI que venen del equip B INPUTS
+bool GPOA[8] = {false, false, false, false, false, false, false, false};      // GPO que van al equip A OUTPUTS
+bool GPOB[8] = {false, false, false, false, false, false, false, false};      // GPO que van al equip B OUTPUTS
+
 // Variables de gestió
+bool GPIA_CHANGE = false; // Per saber si hi han canvis en el GPIA
+bool GPIB_CHANGE = false; // Per saber si hi han canvis en el GPIB
 bool LOCAL_CHANGE = false; // Per saber si alguna cosa local ha canviat
 
 unsigned long temps_set_config = 0;      // Temps que ha d'estar apretat per configuracio
@@ -207,7 +241,7 @@ AsyncEventSource events("/events");
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
 <head>
-  <title>ESP-NOW DASHBOARD</title>
+  <title>TALLY SISTEM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
   <link rel="icon" href="data:,">
@@ -299,6 +333,126 @@ float readBateriaPercent()
   return percent;
 }
 
+void logica_GPO()
+{
+  // Aquesta funció s'encarrega de vigilar que no s'enviin combinacions de GPO
+  // contradictories i crein problemes.
+  // Cal desenvolupar una logica per cada cas.
+
+  if PORT_B
+    = "QL"
+    {
+
+      /*
+      Funcio dels GPO:
+      Estem limitats als GPIO IN de la QL1 (5 max).
+       Bit 0 - MUTE CONDUCTOR
+       Bit 1 - COND Ordres Productor (vermell)
+       Bit 2 - COND Ordres Estudi (verd)
+       Bit 3 - PROD Ordres Conductors (vermell)
+       Bit 4 - PROD Ordres Estudi (verd)
+
+       Que han de fer les escenes de la QL:
+
+       Quan rebem un Bit 1 - Fer MUTE del conductor a programa.
+
+       Quan reben un Bit 2 - CONDUCTOR Ordres a Productor (vermell):
+       Va associat a un mute del Bit1. (Muteja el micro del conductor a PGM, PA..)
+       Unmute del canal CONDUCTOR que va al BUS del PRODUCTOR.
+       Enviar un bit pel GPIO2 (confirmacio)
+
+       Quan reben un Bit 3 - CONDUCTOR Ordres a Estudi (verd):
+       Va associat a un mute del Bit1. (Muteja el micro del conductor a PGM, PA..)
+       Fa unmute del canal del CONDUCTOR que va al BUS de ORDRES ESTUDI OUT.
+       Envia un bit pel GPIO3 (confirmació)
+       Fa unmute del canal ORDRES ESTUDI IN que va al BUS del CONDUCTOR.
+       Podria fer una atenuació del PGM del BUS del conductor.
+
+
+       Quan reben un Bit 4 - PRODUCTOR Ordres a Conductor (vermell):
+       Desmutejar micro productor del BUS que va als auriculars del conductor i del productor,
+       (opcionalment atenuar PGM dels auriculars del conductor i del productor - pq aquest s'escolti a si mateix),
+       enviar un bit de confirmació per la sortida 4.
+
+       Quan reben un Bit 5 - PRODUCTOR Ordres Estudi (verd):
+       Desmutejar micro productor del BUS que va a les ordres del estudi i als auriculars del productor,
+       (opcionalment atenuar PGM dels auriculars del productor - pq aquest s'escolti a si mateix),
+       enviar un bit de confirmació per la sortida 5.
+         */
+
+      // Gestió del Mute del conductor GPIO1 en funció dels bits.
+      if (GPOB[1])
+      // COND dona Ordres a Productor (polsador vermell Conductor)
+      {
+        GPOB[0] = true;  // Fem mute del conductor
+        GPOB[2] = false; // Si tenim GPOB1 apaguem la resta
+        GPOB[3] = false;
+        GPOB[4] = false;
+      }
+      // Prioritzem les ordres del conductor al estudi
+      if (!GPOB[1] && GPOB[2])
+      // Si COND dona Ordres a Estudi i no a productor
+      {
+        GPOB[0] = true;  // Fem mute del conductor
+        GPOB[3] = false; // Si tenim GPOB2 i no GPOB1 apaguem la resta
+        GPOB[4] = false;
+      }
+      // Prioritzem les ordres del productor al conductor
+      if (!GPOB[1] && !GPOB[2] && GPOB[3])
+      // Si PROD dona ordres a CONDUCTOR i CONDUCTOR no dona ordres ni a Estudi ni Productor
+      {
+        GPOB[0] = false; // No fem mute del Conductor
+        GPOB[4] = false;
+      }
+      if (!GPOB[1] && !GPOB[2] && !GPOB[3] && GPOB[4])
+      // Si PROD dona ordres a ESTUDI i no dona a CONDUCTOR ni COND dona ordres a ESTUDI ni PRODUCTOR
+      {
+        GPOB[0] = false; // No fem mute del Conductor
+      }
+      if (!GPOB[0] && !GPOB[1] && !GPOB[2] && !GPOB[3] && !GPOB[4])
+      // Si no apretem cap botó fem i no tenim UNMUTE del CONDUCTOR treiem el MUTE COND
+      {
+        GPOB[0] = false; // No fem mute del Conductor
+        // Si no apretem cap botó ens assegurem unmute del conductor
+      }
+      if (GPOB[0] && !GPOB[1] && !GPOB[2] && !GPOB[3] && !GPOB[4])
+      // Si tenim MUTE del CONDUCTOR i cap BOTO d'ordres: mantenim el mute
+      {
+        GPOB[0] = true; // No fem mute del Conductor
+        // Si no apretem cap botó ens assegurem unmute del conductor
+      }
+    }
+}
+
+void escriure_gpo()
+{
+  // Que passa si apretem tots els botons alhora. La QL intententara carregar 4
+  // memories al mateix temps -> Cosa que la pot liar parda.
+  // La idea es mirar que tan sols un GPOB escrigui els valors.
+  // Per no complicar el codi ho farem amb un void.
+
+  logica_GPO(); // Filtre per enviar només un GPO i fer logica Mute COND
+
+  // Enviament GPOA (VIA)
+  for (uint8_t i = 8; i < 16; i++)
+  {
+    GPEXTA.digitalWrite(i, GPOA[i]);
+    GPEXTB.digitalWrite(i, GPOB[i]);
+    if (debug)
+    {
+      Serial.print("GPOA PIN: ");
+      Serial.print(i2cSetClock);
+      Serial.print("Bit: ");
+      Serial.println(GPOA[i]);
+
+      Serial.print("GPOB PIN: ");
+      Serial.print(i);
+      Serial.print("Bit: ");
+      Serial.println(GPOB[i]);
+    }
+  }
+}
+
 // Posar llum a un color
 void escriure_matrix(uint8_t color)
 {
@@ -358,6 +512,173 @@ void escriure_leds()
 {
   digitalWrite(LED_ROIG_PIN, LED_LOCAL_ROIG);
   digitalWrite(LED_VERD_PIN, LED_LOCAL_VERD);
+}
+
+void logica_GPI()
+{
+  if (debug)
+  {
+    Serial.println("GPI CHANGE");
+  }
+  if (PORT_A = "VIA" && PORT_B = "QL")
+   /*
+     VIA:
+     GPO 0 -> LLUM
+     GPO 3 -> CONECTAT
+
+     QL:
+     GPO 0: MIC COND ON
+     GPO 1: Confirmació COND Ordres Productor (vermell)
+     GPO 2: Confirmació COND Ordres Estudi (verd)
+     GPO 3: Confirmació PROD Ordres Conductors (vermell)
+     GPO 4: Confirmació PROD Ordres Estudi (verd
+     GPO 5: Presencia QL (tensió)
+   */
+  
+  {
+    // CANVIS DE COLOR DE TALLYS
+    if (GPIA[0][3] && GPIB[0][5] && GPIA[0][0] && !GPIB[0][0])
+    // Si presencia VIA i presencia QL i llum VIA i COND ON
+    {
+      // VIA conectat, QL connectat, ON air, Mic obert
+      color_matrix = 1; // Vermell
+      // TEXT = "ON AIR"
+      if (debug)
+      {
+        Serial.println(" A + B + ON AIR + MIC ON");
+      }
+    }
+
+    if (GPIA[0][3] && GPIB[0][5] && !GPIA[0][0] && GPIB[0][0])
+    {
+      // A conectat, B connectat, NO ON air, Mic obert
+      color_matrix = 4; // Groc
+      // TEXT = "TANCAT DES DE ESTUDI"
+      if (debug)
+      {
+        Serial.println(" A + B + OFF AIR + MIC ON");
+      }
+    }
+
+    if (GPIA[0][3] && GPIB[0][5] && GPIA[0][0] && !GPIB[0][0])
+    {
+      // A conectat, B connectat, ON air, NO Mic obert
+      color_matrix = 5; // Taronja
+      // TEXT = "TANCAT DES DE TAULA"
+      if (debug)
+      {
+        Serial.println(" A + B + ON AIR + MIC OFF");
+      }
+    }
+
+    if (GPIA[0][3] && GPIB[0][5] && !GPIA[0][0] && !GPIB[0][0])
+    {
+      // A conectat, B connectat, NO ON air, NO Mic obert
+      color_matrix = 0; // Negre
+      // TEXT = "MICRO TANCAT"
+      if (debug)
+      {
+        Serial.println(" A + B + OFF AIR + MIC OFF");
+      }
+    }
+
+    if (GPIA[0][3] && !GPIB[0][5] && GPIA[0][0])
+    {
+      // A conectat, B NO connectat, ON air
+      color_matrix = 1; // Vermell
+      // TEXT = "ON AIR"
+      if (debug)
+      {
+        Serial.println(" A + NOB + ON AIR");
+      }
+    }
+
+    if (GPIA[0][3] && !GPIB[0][5] && !GPIA[0][0])
+    {
+      // A conectat, B NO connectat, OFF air
+      color_matrix = 0; // Negre
+      // TEXT = "MICRO TANCAT"
+      if (debug)
+      {
+        Serial.println(" A + NOB + OFF AIR");
+      }
+    }
+
+    if (!GPIA[0][3] && GPIB[0][5] && GPIB[0][0])
+    {
+      // A NO conectat, B connectat, Micro Obert
+      color_matrix = 3; // Verd - Gravacio local
+      // TEXT = "MICRO OBERT"
+      if (debug)
+      {
+        Serial.println(" NO A + B + MIC ON");
+      }
+    }
+
+    if (!GPIA[0][3] && GPIB[0][5] && !GPIB[0][0])
+    {
+      // A NO conectat, B connectat, NO Micro Obert
+      color_matrix = 0; // Negre
+      // TEXT = "MICRO TANCAT"
+      if (debug)
+      {
+        Serial.println(" NOA + B + MIC OFF");
+      }
+    }
+  }
+}
+
+void llegir_gpi()
+{
+  // PORT A
+  for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
+  {
+
+    if (PORT_A = "VIA")
+    {
+      GPIA[1][i] = !GPEXTA.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
+      if (GPIA[0][i] != GPIA[1][i])
+      {
+        // GPI CANVIAT
+        GPIA_CHANGE = true;
+        GPIA[0][i] = GPIA[1][i];
+        if (debug)
+        {
+          Serial.print("Boto GPIA");
+          Serial.print(i);
+          Serial.print(": ");
+          Serial.println(GPIA[0][i]);
+        }
+      }
+      else {
+        GPIA_CHANGE = false;
+      }
+    }
+  }
+  // PORT B
+  for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
+  {
+    if (PORT_B = "QL") // QL va amb PULLUP Logica inversa
+    {
+      GPIB[1][i] = GPEXTB.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
+      if (GPIB[0][i] != GPIB[1][i])
+      {
+        // GPI CANVIAT
+        GPIB_CHANGE = true;
+        GPIB[0][i] = GPIB[1][i];
+        if (debug)
+        {
+          Serial.print("Boto GPIB");
+          Serial.print(i);
+          Serial.print(": ");
+          Serial.println(GPIB[0][i]);
+        }
+      } 
+      else {
+        GPIB_CHANGE = false;
+      }
+    }
+  }
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -618,6 +939,19 @@ void setup()
 
   // start server
   server.begin();
+  GPEXTA.begin();             // Arrenquem el modul extra de GPIO A
+  GPEXTB.begin();             // Arrenquem el modul extra de GPIO B
+  for (int i = 0; i < 8; i++) // Definim els 8 primers bits com INPUT PULLUP
+  {
+    GPEXTA.pinMode(i, INPUT_PULLUP);
+    GPEXTB.pinMode(i, INPUT_PULLUP);
+  }
+
+  for (int i = 8; i < 16; i++) // Definim els 8 ultims bits com OUTPUT
+  {
+    GPEXTA.pinMode(i, OUTPUT);
+    GPEXTB.pinMode(i, OUTPUT);
+  }
 }
 
 void loop()
