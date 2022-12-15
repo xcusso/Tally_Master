@@ -106,14 +106,20 @@ Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // Definim els colors GRB
 const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
-                            {255, 0, 0},      // 1- ROIG
+                            {0, 255, 0},      // 1- ROIG
                             {0, 0, 255},      // 2- BLAU
-                            {255, 0, 0},      // 3- VERD
-                            {255, 128, 0},    // 4- GROC
-                            {128, 128, 0},    // 5- TARONJA
-                            {255, 255, 255}}; // 6- BLANC
+                            {0,255,255},      // 3- CEL
+                            {255, 0, 0},      // 4- VERD
+                            {128, 255, 0},    // 5- GROC
+                            {128, 128, 0},    // 6- TARONJA
+                            {255, 255, 255}}; // 7- BLANC
 
 uint8_t color_matrix = 0; // Per determinar color local
+uint8_t color_matrix_llum = 0; // NEGRE (LLUM)
+uint8_t color_matrix_cond = 0; // NEGRE (CONDUCTOR)
+uint8_t color_matrix_prod = 0; // NEGRE (PRODUCTOR)
+
+
 
 // Variables
 // Fem arrays de dos valors la 0 és anterior la 1 actual
@@ -123,6 +129,10 @@ bool POLSADOR_LOCAL_VERD[] = {false, false};
 // Valor dels leds (dels polsadors)
 bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
+bool led_roig_conductor = false;
+bool led_verd_conductor = false;
+bool led_roig_productor = false;
+bool led_verd_productor = false;
 uint16_t BATTERY_LOCAL_READ[] = {0, 0};
 
 // Variables GPIO
