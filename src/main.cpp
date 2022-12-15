@@ -7,6 +7,9 @@
 /*
 TODO
 
+ELIMINAR LES SIMULACIONS DE CONFIRMACIO DE QL!!!
+Linees: 497... i 526...
+
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
 Fer menu selecció funció local
@@ -45,8 +48,8 @@ bool debug = true;
 // Definim equips externs
 // TODO: En el menú de coniguració he de poder configurar quin equip tinc conectat a cada port
 
-// TODO: Autodetecció equip: 
-// Si Input6(bit 5)= ON -> QL 
+// TODO: Autodetecció equip:
+// Si Input6(bit 5)= ON -> QL
 // Si Input 4(bit 3) = ON i INPUT6(bit 5) = OFF -> VIA
 
 #define PORT_A "VIA"
@@ -54,8 +57,8 @@ bool debug = true;
 
 // Define PINS
 // Botons i leds locals
-#define BOTO_ROIG_PIN 16
-#define BOTO_VERD_PIN 5
+#define POLSADOR_ROIG_PIN 16
+#define POLSADOR_VERD_PIN 5
 #define LED_ROIG_PIN 17
 #define LED_VERD_PIN 18
 #define MATRIX_PIN 4
@@ -114,8 +117,8 @@ uint8_t color_matrix = 0; // Per determinar color local
 
 // Variables
 // Fem arrays de dos valors la 0 és anterior la 1 actual
-bool BOTO_LOCAL_ROIG[] = {false, false};
-bool BOTO_LOCAL_VERD[] = {false, false};
+bool POLSADOR_LOCAL_ROIG[] = {false, false};
+bool POLSADOR_LOCAL_VERD[] = {false, false};
 
 // Valor dels leds (dels polsadors)
 bool LED_LOCAL_ROIG = false;
@@ -134,8 +137,8 @@ bool GPOA[8] = {false, false, false, false, false, false, false, false};      //
 bool GPOB[8] = {false, false, false, false, false, false, false, false};      // GPO que van al equip B OUTPUTS
 
 // Variables de gestió
-bool GPIA_CHANGE = false; // Per saber si hi han canvis en el GPIA
-bool GPIB_CHANGE = false; // Per saber si hi han canvis en el GPIB
+bool GPIA_CHANGE = false;  // Per saber si hi han canvis en el GPIA
+bool GPIB_CHANGE = false;  // Per saber si hi han canvis en el GPIB
 bool LOCAL_CHANGE = false; // Per saber si alguna cosa local ha canviat
 
 unsigned long temps_set_config = 0;      // Temps que ha d'estar apretat per configuracio
@@ -211,8 +214,8 @@ typedef struct struct_message_from_slave
   uint8_t msgType;
   uint8_t id;     // Identificador del tally
   uint8_t funcio; // Identificador de la funcio del tally
-  bool boto_roig;
-  bool boto_verd;
+  bool polsador_roig;
+  bool polsador_verd;
 } struct_message_from_slave;
 
 // Estructura dades per rebre bateries
@@ -333,7 +336,7 @@ float readBateriaPercent()
   return percent;
 }
 
-void logica_GPO()
+void logica_gpo()
 {
   // Aquesta funció s'encarrega de vigilar que no s'enviin combinacions de GPO
   // contradictories i crein problemes.
@@ -409,16 +412,12 @@ void logica_GPO()
       {
         GPOB[0] = false; // No fem mute del Conductor
       }
+
+      // ATENCIO QUE PASA SI FAIG UN MUTE DEL CONDUCTOR DES DE TAULA???
       if (!GPOB[0] && !GPOB[1] && !GPOB[2] && !GPOB[3] && !GPOB[4])
       // Si no apretem cap botó fem i no tenim UNMUTE del CONDUCTOR treiem el MUTE COND
       {
         GPOB[0] = false; // No fem mute del Conductor
-        // Si no apretem cap botó ens assegurem unmute del conductor
-      }
-      if (GPOB[0] && !GPOB[1] && !GPOB[2] && !GPOB[3] && !GPOB[4])
-      // Si tenim MUTE del CONDUCTOR i cap BOTO d'ordres: mantenim el mute
-      {
-        GPOB[0] = true; // No fem mute del Conductor
         // Si no apretem cap botó ens assegurem unmute del conductor
       }
     }
@@ -426,7 +425,7 @@ void logica_GPO()
 
 void escriure_gpo()
 {
-  // Que passa si apretem tots els botons alhora. La QL intententara carregar 4
+  // Que passa si apretem tots els polsadors alhora. La QL intententara carregar 4
   // memories al mateix temps -> Cosa que la pot liar parda.
   // La idea es mirar que tan sols un GPOB escrigui els valors.
   // Per no complicar el codi ho farem amb un void.
@@ -478,32 +477,107 @@ void escriure_matrix(uint8_t color)
   }
 }
 
-void llegir_botons()
+void logica_polsadors_locals()
 {
-  BOTO_LOCAL_ROIG[1] = !digitalRead(BOTO_ROIG_PIN); // Els botons son PULLUP per tant els llegirem al revés
-  BOTO_LOCAL_VERD[1] = !digitalRead(BOTO_VERD_PIN);
-  // Detecció canvi de botons locals
-  if (BOTO_LOCAL_ROIG[0] != BOTO_LOCAL_ROIG[1])
+  if (!mode_configuracio && funcio_local == "CONDUCTOR") // Si no estic en configuracio i SOC CONDUCTOR
   {
-    /// HEM POLSAT EL BOTO ROIG
-    LOCAL_CHANGE = true;
-    BOTO_LOCAL_ROIG[0] = BOTO_LOCAL_ROIG[1];
-    if (debug)
+    if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
+    // Si no apreto els dos polsadors simultaneament
     {
-      Serial.print("Boto local ROIG: ");
-      Serial.println(BOTO_LOCAL_ROIG[0]);
+      GPOB[0] = true;                   // Faig MUTE del micro CONDUCTOR o POTSER HO HAURIA DE FER EN REBRE CONFIRMACIO?
+      GPOB[1] = POLSADOR_LOCAL_ROIG[0]; // Si funcio=conductor enviem bit a gpo1 vermell
+      GPOB[2] = POLSADOR_LOCAL_VERD[0]; // si funcio=conductor enviem bit a gpo2 verd
+      if (POLSADOR_LOCAL_ROIG[0])
+      {
+        // TEXTE = "ORDRES AL PRODUCTOR"
+        if (debug)
+        {
+          Serial.print("ORDRES COND A PRODUCTOR");
+        }
+      }
+      if (POLSADOR_LOCAL_VERD[0])
+      {
+        // TEXTE = "ORDRES A ESTUDI"
+        if (debug)
+        {
+          Serial.print("ORDRES COND A ESTUDI");
+        }
+      }
+      //************* CAL ELIMINAR AIXO *********
+      // Simulem GPO indicant GPI (simulem la QL)
+      GPIB[1][1] = GPOB[1];
+      GPIB[1][2] = GPOB[2];
+      GPI_CHANGE = true;
+      //************* CAL ELIMINAR AIXO *********
     }
   }
 
-  if (BOTO_LOCAL_VERD[0] != BOTO_LOCAL_VERD[1])
+  if (!mode_configuracio && funcio_local == "PRODUCTOR") // SOC PRODUCTOR
   {
-    /// HEM POLSAT EL BOTO VERD
+    if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
+    // Si no apreto els dos polsadors simultaneament
+    {
+      GPOB[3] = POLSADOR_LOCAL_ROIG[0]; // Si funcio=productor enviem el bit a gpo4 roig
+      GPOB[4] = POLSADOR_LOCAL_VERD[0]; // Si funcio=productor enviem el bit a gpo5 verd
+
+      if (POLSADOR_LOCAL_ROIG[0])
+      {
+        // TEXTE = "ORDRES AL CONDUCTOR"
+        if (debug)
+        {
+          Serial.print("ORDRES PROD AL CONDUCTOR");
+        }
+      }
+      if (POLSADOR_LOCAL_VERD[0])
+      {
+        // TEXTE = "ORDRES A ESTUDI"
+        if (debug)
+        {
+          Serial.print("ORDRES PROD A ESTUDI");
+        }
+      }
+
+      if (debug)
+      {
+        Serial.print("UN SOL POLSADOR PRODUCTOR");
+      }
+      //************* CAL ELIMINAR AIXO *********
+      // Simulem GPO indicant GPI (simulem la QL)
+      GPIB[1][3] = GPOB[3];
+      GPIB[1][4] = GPOB[4];
+      GPIBB_CHANGE = true;
+      //************* CAL ELIMINAR AIXO *********
+    }
+  }
+}
+
+
+void llegir_polsadors()
+{
+  POLSADOR_LOCAL_ROIG[1] = !digitalRead(POLSADOR_ROIG_PIN); // Els POLSADOR son PULLUP per tant els llegirem al revés
+  POLSADOR_LOCAL_VERD[1] = !digitalRead(POLSADOR_VERD_PIN);
+  // Detecció canvi de POLSADOR locals
+  if (POLSADOR_LOCAL_ROIG[0] != POLSADOR_LOCAL_ROIG[1])
+  {
+    /// HEM POLSAT EL POLSADOR ROIG
     LOCAL_CHANGE = true;
-    BOTO_LOCAL_VERD[0] = BOTO_LOCAL_VERD[1];
+    POLSADOR_LOCAL_ROIG[0] = POLSADOR_LOCAL_ROIG[1];
     if (debug)
     {
-      Serial.print("Boto local VERD: ");
-      Serial.println(BOTO_LOCAL_VERD[0]);
+      Serial.print("POLSADOR local ROIG: ");
+      Serial.println(POLSADOR_LOCAL_ROIG[0]);
+    }
+  }
+
+  if (POLSADOR_LOCAL_VERD[0] != POLSADOR_LOCAL_VERD[1])
+  {
+    /// HEM POLSAT EL POLSADOR VERD
+    LOCAL_CHANGE = true;
+    POLSADOR_LOCAL_VERD[0] = POLSADOR_LOCAL_VERD[1];
+    if (debug)
+    {
+      Serial.print("POLSADOR local VERD: ");
+      Serial.println(POLSADOR_LOCAL_VERD[0]);
     }
   }
 }
@@ -514,27 +588,27 @@ void escriure_leds()
   digitalWrite(LED_VERD_PIN, LED_LOCAL_VERD);
 }
 
-void logica_GPI()
+void logica_gpi()
 {
   if (debug)
   {
     Serial.println("GPI CHANGE");
   }
-  if (PORT_A = "VIA" && PORT_B = "QL")
-   /*
-     VIA:
-     GPO 0 -> LLUM
-     GPO 3 -> CONECTAT
+  if (PORT_A = "VIA" &&PORT_B = "QL")
+  /*
+    VIA:
+    GPO 0 -> LLUM
+    GPO 3 -> CONECTAT
 
-     QL:
-     GPO 0: MIC COND ON
-     GPO 1: Confirmació COND Ordres Productor (vermell)
-     GPO 2: Confirmació COND Ordres Estudi (verd)
-     GPO 3: Confirmació PROD Ordres Conductors (vermell)
-     GPO 4: Confirmació PROD Ordres Estudi (verd
-     GPO 5: Presencia QL (tensió)
-   */
-  
+    QL:
+    GPO 0: MIC COND ON
+    GPO 1: Confirmació COND Ordres Productor (vermell)
+    GPO 2: Confirmació COND Ordres Estudi (verd)
+    GPO 3: Confirmació PROD Ordres Conductors (vermell)
+    GPO 4: Confirmació PROD Ordres Estudi (verd
+    GPO 5: Presencia QL (tensió)
+  */
+
   {
     // CANVIS DE COLOR DE TALLYS
     if (GPIA[0][3] && GPIB[0][5] && GPIA[0][0] && !GPIB[0][0])
@@ -644,13 +718,14 @@ void llegir_gpi()
         GPIA[0][i] = GPIA[1][i];
         if (debug)
         {
-          Serial.print("Boto GPIA");
+          Serial.print("POLSADOR GPIA");
           Serial.print(i);
           Serial.print(": ");
           Serial.println(GPIA[0][i]);
         }
       }
-      else {
+      else
+      {
         GPIA_CHANGE = false;
       }
     }
@@ -668,13 +743,14 @@ void llegir_gpi()
         GPIB[0][i] = GPIB[1][i];
         if (debug)
         {
-          Serial.print("Boto GPIB");
+          Serial.print("POLSADOR GPIB");
           Serial.print(i);
           Serial.print(": ");
           Serial.println(GPIB[0][i]);
         }
-      } 
-      else {
+      }
+      else
+      {
         GPIB_CHANGE = false;
       }
     }
@@ -768,9 +844,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
             Serial.print("Funció  = ");
         Serial.println(fromSlave.funcio);
         Serial.print("Led roig = ");
-        Serial.println(fromSlave.boto_roig);
+        Serial.println(fromSlave.polsador_roig);
         Serial.print("Led verd= ");
-        Serial.println(fromSlave.boto_verd);
+        Serial.println(fromSlave.polsador_verd);
       }
       // PROCESSAR DADES REBUDES
       break;
@@ -786,9 +862,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
             Serial.print("Funció  = ");
         Serial.println(fromSlave.funcio);
         Serial.print("Led roig = ");
-        Serial.println(fromSlave.boto_roig);
+        Serial.println(fromSlave.polsador_roig);
         Serial.print("Led verd= ");
-        Serial.println(fromSlave.boto_verd);
+        Serial.println(fromSlave.polsador_verd);
         */
       }
       // PROCESSAR DADES REBUDES
@@ -840,7 +916,7 @@ void detectar_mode_configuracio()
 {
   if (LOCAL_CHANGE)
   {
-    if (BOTO_LOCAL_ROIG[0] && BOTO_LOCAL_VERD[0] && !pre_mode_configuracio)
+    if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && !pre_mode_configuracio)
     {
       // Tenim els dos polsadors apretats i no estem en pre_mode_configuracio
       // Entrarem al mode CONFIG
@@ -852,8 +928,8 @@ void detectar_mode_configuracio()
       }
     }
 
-    if ((!BOTO_LOCAL_ROIG[0] || !BOTO_LOCAL_VERD[0]) && pre_mode_configuracio)
-    { // Si deixem de pulsar botons i estavem en pre_mode_de_configuracio
+    if ((!POLSADOR_LOCAL_ROIG[0] || !POLSADOR_LOCAL_VERD[0]) && pre_mode_configuracio)
+    { // Si deixem de pulsar polsadors i estavem en pre_mode_de_configuracio
       if ((millis()) >= (temps_config + temps_set_config))
       {                                // Si ha pasat el temps d'activació
         mode_configuracio = true;      // Entrem en mode configuracio
