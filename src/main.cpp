@@ -384,7 +384,9 @@ void logica_gpo()
          */
 
       // Gestió del Mute del conductor GPIO1 en funció dels bits.
+
       if (GPOB[1])
+      // Ordres CONDUCTOR A PRODUCTOR
       // COND dona Ordres a Productor (polsador vermell Conductor)
       {
         GPOB[0] = true;  // Fem mute del conductor
@@ -393,7 +395,9 @@ void logica_gpo()
         GPOB[4] = false;
       }
       // Prioritzem les ordres del conductor al estudi
+
       if (!GPOB[1] && GPOB[2])
+      // Ordres CONDUCTOR A ESTUDI
       // Si COND dona Ordres a Estudi i no a productor
       {
         GPOB[0] = true;  // Fem mute del conductor
@@ -401,12 +405,15 @@ void logica_gpo()
         GPOB[4] = false;
       }
       // Prioritzem les ordres del productor al conductor
+
       if (!GPOB[1] && !GPOB[2] && GPOB[3])
+      // Ordres PRODUCTOR A CONDUCTOR
       // Si PROD dona ordres a CONDUCTOR i CONDUCTOR no dona ordres ni a Estudi ni Productor
       {
         GPOB[0] = false; // No fem mute del Conductor
         GPOB[4] = false;
       }
+
       if (!GPOB[1] && !GPOB[2] && !GPOB[3] && GPOB[4])
       // Si PROD dona ordres a ESTUDI i no dona a CONDUCTOR ni COND dona ordres a ESTUDI ni PRODUCTOR
       {
@@ -484,12 +491,11 @@ void logica_polsadors_locals()
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
     {
-      GPOB[0] = true;                   // Faig MUTE del micro CONDUCTOR o POTSER HO HAURIA DE FER EN REBRE CONFIRMACIO?
+      // El MUTE del micro CONDUCTOR es fa en rebre confirmació
       GPOB[1] = POLSADOR_LOCAL_ROIG[0]; // Si funcio=conductor enviem bit a gpo1 vermell
       GPOB[2] = POLSADOR_LOCAL_VERD[0]; // si funcio=conductor enviem bit a gpo2 verd
       if (POLSADOR_LOCAL_ROIG[0])
       {
-        // TEXTE = "ORDRES AL PRODUCTOR"
         if (debug)
         {
           Serial.print("ORDRES COND A PRODUCTOR");
@@ -497,7 +503,6 @@ void logica_polsadors_locals()
       }
       if (POLSADOR_LOCAL_VERD[0])
       {
-        // TEXTE = "ORDRES A ESTUDI"
         if (debug)
         {
           Serial.print("ORDRES COND A ESTUDI");
@@ -522,7 +527,6 @@ void logica_polsadors_locals()
 
       if (POLSADOR_LOCAL_ROIG[0])
       {
-        // TEXTE = "ORDRES AL CONDUCTOR"
         if (debug)
         {
           Serial.print("ORDRES PROD AL CONDUCTOR");
@@ -530,7 +534,6 @@ void logica_polsadors_locals()
       }
       if (POLSADOR_LOCAL_VERD[0])
       {
-        // TEXTE = "ORDRES A ESTUDI"
         if (debug)
         {
           Serial.print("ORDRES PROD A ESTUDI");
@@ -550,7 +553,6 @@ void logica_polsadors_locals()
     }
   }
 }
-
 
 void llegir_polsadors()
 {
@@ -594,7 +596,7 @@ void logica_gpi()
   {
     Serial.println("GPI CHANGE");
   }
-  if (PORT_A = "VIA" &&PORT_B = "QL")
+  if ((PORT_A = "VIA") && (PORT_B = "QL"))
   /*
     VIA:
     GPO 0 -> LLUM
@@ -609,94 +611,483 @@ void logica_gpi()
     GPO 5: Presencia QL (tensió)
   */
 
-  {
-    // CANVIS DE COLOR DE TALLYS
-    if (GPIA[0][3] && GPIB[0][5] && GPIA[0][0] && !GPIB[0][0])
-    // Si presencia VIA i presencia QL i llum VIA i COND ON
+  { // TENIM VIA I QL CONNECTATS
+    if (GPIA[0][3] && GPIB[0][5])
     {
-      // VIA conectat, QL connectat, ON air, Mic obert
-      color_matrix = 1; // Vermell
-      // TEXT = "ON AIR"
-      if (debug)
+      if ((GPIB[0][1] && (GPIB[0][2] || GPIB[0][3] || GPIB[0][4])) ||
+          (GPIB[0][2] && (GPIB[0][1] || GPIB[0][3] || GPIB[0][4])) ||
+          (GPIB[0][3] && (GPIB[0][1] || GPIB[0][2] || GPIB[0][4])) ||
+          (GPIB[0][4] && (GPIB[0][1] || GPIB[0][2] || GPIB[0][3])))
+      // SI tenim més de una confirmació simultanea el sistema falla
+      // DONAREM ERRROR I APAGUAREM TALLYS
       {
-        Serial.println(" A + B + ON AIR + MIC ON");
+        // TEXT_LLUM = "ERROR GPI QL"
+        // TEXT_COND = "ERROR GPI QL"
+        // TEXT_PROD = "ERROR GPI QL"
+        color_matrix_llum = 0; // Negre (LLUM)
+        color_matrix_cond = 0; // Negre (CONDUCTOR)
+        color_matrix_prod = 0; // Negre (PRODUCTOR)
+        led_roig_conductor = false;
+        led_verd_conductor = false;
+        led_roig_productor = false;
+        led_verd_productor = false;
+        if (debug)
+        {
+          Serial.println(" A + B + ON AIR + MIC ON");
+        }
+      }
+      else
+      {
+        // Presencia de VIA I QL ==================================================
+        if (GPIA[0][0])
+        {
+          // Tenim BIT ON AIR *****************************************************
+
+          if (GPIB[0][0])
+          {
+            // Mic COND Obert -- CAL MIRAR SI EL BIT ES OBERT o INDICA MUTE
+            //  Girar la lógica si cal
+
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si notenim cap confirmació d'ordres
+              // TEXT_LLUM = "ON AIR"
+              // TEXT_COND = "ON AIR"
+              // TEXT_PROD = "ON AIR"
+              color_matrix_llum = 1; // Vermell (LLUM)
+              color_matrix_cond = 1; // Vermell (CONDUCTOR)
+              color_matrix_prod = 1; // Vermell (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC ON");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A CONDUCTOR
+              // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
+              // TEXT_COND = "ORDRES DEL PRODUCTOR"
+              // TEXT_PROD = "ORDRES A CONDUCTOR"
+              color_matrix_llum = 1; // Vermell (LLUM)
+              color_matrix_cond = 1; // Vermell (CONDUCTOR)
+              color_matrix_prod = 1; // Blau (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = true;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC ON + ORDRES PROD 2 COND");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A ESTUDI
+              // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
+              // TEXT_COND = "ON AIR"
+              // TEXT_PROD = "ORDRES A ESTUDI"
+              color_matrix_llum = 1; // Vermell (LLUM)
+              color_matrix_cond = 1; // Vermell (CONDUCTOR)
+              color_matrix_prod = 3; // Cel (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = true;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC ON + ORDRES PROD 2 ESTU");
+              }
+            }
+          }
+          else
+          // Si no tenim micro COND Obert
+          {
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si no tenim cap ordre Nomes micro tancat a QL
+              // TEXT_LLUM = "TANCAT DES DE TAULA"
+              // TEXT_COND = "TANCAT DES DE TAULA"
+              // TEXT_PROD = "TANCAT DES DE TAULA"
+              color_matrix_llum = 6; // Taronja (LLUM)
+              color_matrix_cond = 6; // Taronja (CONDUCTOR)
+              color_matrix_prod = 6; // Taronja (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC OFF + NO ORDRES");
+              }
+            }
+            if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres COND A PROD
+              // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
+              // TEXT_COND = "ORDRES A PRODUCTOR"
+              // TEXT_PROD = "ON AIR"
+              color_matrix_llum = 1; // Vermell (LLUM)
+              color_matrix_cond = 2; // Blau (CONDUCTOR)
+              color_matrix_prod = 1; // Vermell (PRODUCTOR)
+              led_roig_conductor = true;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC OFF + ORDRES COND 2 PROD");
+              }
+            }
+            if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres COND A ESTU
+              // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
+              // TEXT_COND = "ORDRES A ESTUDI"
+              // TEXT_PROD = "ON AIR"
+              color_matrix_llum = 1; // Vermell (LLUM)
+              color_matrix_cond = 3; // Cel (CONDUCTOR)
+              color_matrix_prod = 1; // Vermell (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = true;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
+              }
+            }
+          }
+        }
+        else
+        {
+          // No tenim BIT ON AIR **********************************************
+          if (GPIB[0][0])
+          {
+            // Mic COND Obert -- CAL MIRAR SI EL BIT ES OBERT o INDICA MUTE
+            //  Girar la lógica si cal
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si notenim cap confirmació d'ordres
+              // TEXT_LLUM = "TANCAT DES ESTUDI"
+              // TEXT_COND = "TANCAT DES ESTUDI"
+              // TEXT_PROD = "TANCAT DES ESTUDI"
+              color_matrix_llum = 5; // Groc (LLUM)
+              color_matrix_cond = 5; // Groc (CONDUCTOR)
+              color_matrix_prod = 5; // Groc (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC ON");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A CONDUCTOR
+              // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
+              // TEXT_COND = "ORDRES DEL PRODUCTOR"
+              // TEXT_PROD = "ORDRES A CONDUCTOR"
+              color_matrix_llum = 5; // Groc (LLUM)
+              color_matrix_cond = 5; // Groc (CONDUCTOR)
+              color_matrix_prod = 1; // Blau (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = true;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC ON + ORDRES PROD 2 COND");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A ESTUDI
+              // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
+              // TEXT_COND = "ON AIR"
+              // TEXT_PROD = "ORDRES A ESTUDI"
+              color_matrix_llum = 3; // Groc (LLUM)
+              color_matrix_cond = 3; // Groc (CONDUCTOR)
+              color_matrix_prod = 3; // Cel (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = true;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC ON + ORDRES PROD 2 ESTU");
+              }
+            }
+          }
+          else
+          // Si no tenim micro COND Obert
+          {
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si no tenim cap ordre Nomes micro tancat a QL
+              // TEXT_LLUM = "TANCAT"
+              // TEXT_COND = "TANCAT"
+              // TEXT_PROD = "TANCAT"
+              color_matrix_llum = 7; // Blanc (LLUM)
+              color_matrix_cond = 7; // Blanc (CONDUCTOR)
+              color_matrix_prod = 7; // Blanc (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC OFF + NO ORDRES");
+              }
+            }
+            if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres COND A PROD
+              // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
+              // TEXT_COND = "ORDRES A PRODUCTOR"
+              // TEXT_PROD = "ON AIR"
+              color_matrix_llum = 7; // Blanc (LLUM)
+              color_matrix_cond = 2; // Blau (CONDUCTOR)
+              color_matrix_prod = 7; // Blanc (PRODUCTOR)
+              led_roig_conductor = true;
+              led_verd_conductor = false;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES COND 2 PROD");
+              }
+            }
+            if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres COND A ESTU
+              // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
+              // TEXT_COND = "ORDRES A ESTUDI"
+              // TEXT_PROD = "ON AIR"
+              color_matrix_llum = 7; // Blanc (LLUM)
+              color_matrix_cond = 3; // Cel (CONDUCTOR)
+              color_matrix_prod = 7; // Blanc (PRODUCTOR)
+              led_roig_conductor = false;
+              led_verd_conductor = true;
+              led_roig_productor = false;
+              led_verd_productor = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES COND 2 ESTU");
+              }
+            }
+          }
+        }
       }
     }
 
-    if (GPIA[0][3] && GPIB[0][5] && !GPIA[0][0] && GPIB[0][0])
+    if (!GPIA[0][3] && GPIB[0][5])
     {
-      // A conectat, B connectat, NO ON air, Mic obert
-      color_matrix = 4; // Groc
-      // TEXT = "TANCAT DES DE ESTUDI"
-      if (debug)
+      if ((GPIB[0][1] && (GPIB[0][2] || GPIB[0][3] || GPIB[0][4])) ||
+          (GPIB[0][2] && (GPIB[0][1] || GPIB[0][3] || GPIB[0][4])) ||
+          (GPIB[0][3] && (GPIB[0][1] || GPIB[0][2] || GPIB[0][4])) ||
+          (GPIB[0][4] && (GPIB[0][1] || GPIB[0][2] || GPIB[0][3])))
+      // SI tenim més de una confirmació simultanea el sistema falla
+      // DONAREM ERRROR I APAGUAREM TALLYS
       {
-        Serial.println(" A + B + OFF AIR + MIC ON");
+        // TEXT_LLUM = "ERROR GPI QL"
+        // TEXT_COND = "ERROR GPI QL"
+        // TEXT_PROD = "ERROR GPI QL"
+        color_matrix_llum = 0; // Negre (LLUM)
+        color_matrix_cond = 0; // Negre (CONDUCTOR)
+        color_matrix_prod = 0; // Negre (PRODUCTOR)
+        led_roig_conductor = false;
+        led_verd_conductor = false;
+        led_roig_productor = false;
+        led_verd_productor = false;
+        if (debug)
+        {
+          Serial.println(" A + B + ON AIR + MIC ON");
+        }
+      }
+      else
+      {
+
+        // Presencia nomes de QL ==============================================
+        if (GPIB[0][0])
+        {
+          // Mic COND Obert -- CAL MIRAR SI EL BIT ES OBERT o INDICA MUTE
+          //  Girar la lógica si cal
+          if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si notenim cap confirmació d'ordres
+            // TEXT_LLUM = "ON AIR"
+            // TEXT_COND = "ON AIR"
+            // TEXT_PROD = "ON AIR"
+            color_matrix_llum = 4; // Verd (LLUM)
+            color_matrix_cond = 4; // Verd (CONDUCTOR)
+            color_matrix_prod = 4; // Verd (PRODUCTOR)
+            led_roig_conductor = false;
+            led_verd_conductor = false;
+            led_roig_productor = false;
+            led_verd_productor = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B + MIC ON");
+            }
+          }
+          if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si tenim confirmació ordres PROD A CONDUCTOR
+            // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
+            // TEXT_COND = "ORDRES DEL PRODUCTOR"
+            // TEXT_PROD = "ORDRES A CONDUCTOR"
+            color_matrix_llum = 4; // Verd (LLUM)
+            color_matrix_cond = 4; // Verd (CONDUCTOR)
+            color_matrix_prod = 2; // Blau (PRODUCTOR)
+            led_roig_conductor = false;
+            led_verd_conductor = false;
+            led_roig_productor = true;
+            led_verd_productor = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B + MIC ON + ORDRES PROD 2 COND");
+            }
+          }
+          if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+          {
+            // Si tenim confirmació ordres PROD A ESTUDI
+            // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
+            // TEXT_COND = "ON AIR"
+            // TEXT_PROD = "ORDRES A ESTUDI"
+            color_matrix_llum = 4; // Verd (LLUM)
+            color_matrix_cond = 4; // Verd (CONDUCTOR)
+            color_matrix_prod = 3; // Cel (PRODUCTOR)
+            led_roig_conductor = false;
+            led_verd_conductor = false;
+            led_roig_productor = false;
+            led_verd_productor = true;
+            if (debug)
+            {
+              Serial.println(" NO A + B + MIC ON + ORDRES PROD 2 ESTU");
+            }
+          }
+        }
+        else
+        // Si no tenim micro COND Obert
+        {
+          if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si no tenim cap ordre Nomes micro tancat a QL
+            // TEXT_LLUM = "TANCAT DES DE TAULA"
+            // TEXT_COND = "TANCAT DES DE TAULA"
+            // TEXT_PROD = "TANCAT DES DE TAULA"
+            color_matrix_llum = 6; // Taronja (LLUM)
+            color_matrix_cond = 6; // Taronja (CONDUCTOR)
+            color_matrix_prod = 6; // Taronja (PRODUCTOR)
+            led_roig_conductor = false;
+            led_verd_conductor = false;
+            led_roig_productor = false;
+            led_verd_productor = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B  + MIC OFF + NO ORDRES");
+            }
+          }
+          if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si tenim confirmació ordres COND A PROD
+            // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
+            // TEXT_COND = "ORDRES A PRODUCTOR"
+            // TEXT_PROD = "ON AIR"
+            color_matrix_llum = 4; // Verd (LLUM)
+            color_matrix_cond = 2; // Blau (CONDUCTOR)
+            color_matrix_prod = 4; // Verd (PRODUCTOR)
+            led_roig_conductor = true;
+            led_verd_conductor = false;
+            led_roig_productor = false;
+            led_verd_productor = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B + MIC OFF + ORDRES COND 2 PROD");
+            }
+          }
+          if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si tenim confirmació ordres COND A ESTU
+            // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
+            // TEXT_COND = "ORDRES A ESTUDI"
+            // TEXT_PROD = "ON AIR"
+            color_matrix_llum = 4; // Verd (LLUM)
+            color_matrix_cond = 3; // Cel (CONDUCTOR)
+            color_matrix_prod = 4; // Verd (PRODUCTOR)
+            led_roig_conductor = false;
+            led_verd_conductor = true;
+            led_roig_productor = false;
+            led_verd_productor = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
+            }
+          }
+        }
       }
     }
 
-    if (GPIA[0][3] && GPIB[0][5] && GPIA[0][0] && !GPIB[0][0])
+    if (GPIA[0][3] && !GPIB[0][5])
     {
-      // A conectat, B connectat, ON air, NO Mic obert
-      color_matrix = 5; // Taronja
-      // TEXT = "TANCAT DES DE TAULA"
-      if (debug)
+      // Presencia de VIA PERO NO DE QL ========================================
+      if (GPIA[0][0])
       {
-        Serial.println(" A + B + ON AIR + MIC OFF");
+        // TEXT_LLUM = "ON AIR"
+        // TEXT_COND = "ON AIR"
+        // TEXT_PROD = "ON AIR"
+        color_matrix_llum = 1; // Vermell (LLUM)
+        color_matrix_cond = 1; // Vermell (CONDUCTOR)
+        color_matrix_prod = 1; // Vermell (PRODUCTOR)
+        led_roig_conductor = false;
+        led_verd_conductor = false;
+        led_roig_productor = false;
+        led_verd_productor = false;
+        if (debug)
+        {
+          Serial.println(" A + NO B + ON AIR ");
+        }
+      }
+      else
+      {
+        // TEXT_LLUM = "TANCAT"
+        // TEXT_COND = "TANCAT"
+        // TEXT_PROD = "TANCAT"
+        color_matrix_llum = 7; // Blanc (LLUM)
+        color_matrix_cond = 7; // Blanc (CONDUCTOR)
+        color_matrix_prod = 7; // Blanc (PRODUCTOR)
+        led_roig_conductor = false;
+        led_verd_conductor = false;
+        led_roig_productor = false;
+        led_verd_productor = false;
+        if (debug)
+        {
+          Serial.println(" A + NO B + OFF AIR");
+        }
       }
     }
 
-    if (GPIA[0][3] && GPIB[0][5] && !GPIA[0][0] && !GPIB[0][0])
+    if (!GPIA[0][3] && !GPIB[0][5])
     {
-      // A conectat, B connectat, NO ON air, NO Mic obert
-      color_matrix = 0; // Negre
-      // TEXT = "MICRO TANCAT"
+      // TEXT_LLUM = "FORA DE SERVEI"
+      // TEXT_COND = "FORA DE SERVEI"
+      // TEXT_PROD = "FORA DE SERVEI"
+      color_matrix_llum = 0; // NEGRE (LLUM)
+      color_matrix_cond = 0; // NEGRE (CONDUCTOR)
+      color_matrix_prod = 0; // NEGRE (PRODUCTOR)
+      led_roig_conductor = false;
+      led_verd_conductor = false;
+      led_roig_productor = false;
+      led_verd_productor = false;
       if (debug)
       {
-        Serial.println(" A + B + OFF AIR + MIC OFF");
-      }
-    }
-
-    if (GPIA[0][3] && !GPIB[0][5] && GPIA[0][0])
-    {
-      // A conectat, B NO connectat, ON air
-      color_matrix = 1; // Vermell
-      // TEXT = "ON AIR"
-      if (debug)
-      {
-        Serial.println(" A + NOB + ON AIR");
-      }
-    }
-
-    if (GPIA[0][3] && !GPIB[0][5] && !GPIA[0][0])
-    {
-      // A conectat, B NO connectat, OFF air
-      color_matrix = 0; // Negre
-      // TEXT = "MICRO TANCAT"
-      if (debug)
-      {
-        Serial.println(" A + NOB + OFF AIR");
-      }
-    }
-
-    if (!GPIA[0][3] && GPIB[0][5] && GPIB[0][0])
-    {
-      // A NO conectat, B connectat, Micro Obert
-      color_matrix = 3; // Verd - Gravacio local
-      // TEXT = "MICRO OBERT"
-      if (debug)
-      {
-        Serial.println(" NO A + B + MIC ON");
-      }
-    }
-
-    if (!GPIA[0][3] && GPIB[0][5] && !GPIB[0][0])
-    {
-      // A NO conectat, B connectat, NO Micro Obert
-      color_matrix = 0; // Negre
-      // TEXT = "MICRO TANCAT"
-      if (debug)
-      {
-        Serial.println(" NOA + B + MIC OFF");
+        Serial.println(" NO A + NO B ");
       }
     }
   }
