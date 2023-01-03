@@ -36,6 +36,7 @@ Lectura valors reals bateria
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h> //Control neopixels
 #include "PC8757.h"            //Expansió I2C GPIO
+#include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
 #define VERSIO "M1" // Versió del software
 
@@ -44,6 +45,13 @@ bool debug = true;
 
 // Set your Board and Server ID
 #define BOARD_ID 0 // Cal definir cada placa amb el seu numero
+// TODO Poder definir en el menu el numero
+#define MAX_CHANNEL 13 // for North America // 13 in Europe
+
+// Configurem LED BUILTIN
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 13 // definim el LED local de la placa
+#endif
 
 // Definim equips externs
 // TODO: En el menú de coniguració he de poder configurar quin equip tinc conectat a cada port
@@ -119,7 +127,8 @@ uint8_t color_matrix_llum = 0; // NEGRE (LLUM)
 uint8_t color_matrix_cond = 0; // NEGRE (CONDUCTOR)
 uint8_t color_matrix_prod = 0; // NEGRE (PRODUCTOR)
 
-
+// Declarem el display LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2); //0x27 adreça I2C 16 = Caracters 2= Linees
 
 // Variables
 // Fem arrays de dos valors la 0 és anterior la 1 actual
@@ -1371,10 +1380,33 @@ void setup()
 {
   // Initialize Serial Monitor
   Serial.begin(115200);
-
+  
+  lcd.init(); // Inicialitzem lcd
+  lcd.backlight(); // Arrenquem la llum de fons lcd
+  lcd.clear(); // Esborrem la pantalla
+  
   Serial.println();
+
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  // Configurem els pins BOTONS/LEDS
+  pinMode(BOTO_ROIG_PIN, INPUT_PULLUP);
+  pinMode(BOTO_VERD_PIN, INPUT_PULLUP);
+  pinMode(LED_ROIG_PIN, OUTPUT);
+  pinMode(LED_VERD_PIN, OUTPUT);
+
+  Serial.println("ESP32 TALLY MASTER");
+  Serial.print("Versió: ");
+  Serial.println(VERSIO);
   Serial.print("Server MAC Address:  ");
   Serial.println(WiFi.macAddress());
+
+  lcd.setCursor(0,0); // Situem cursor primer caracter, primera linea
+  lcd.print("ESP32 TALLY MASTER");
+  lcd.setCursor(0,1); // Primer caracter, segona linea
+  lcd.print("Versió: ");
+  lcd.setCursor(9,1); // Caracter 9, segona linea
+  lcd.print(VERSIO);
 
   // Set the device as a Station and Soft Access Point simultaneously
   WiFi.mode(WIFI_AP_STA);
