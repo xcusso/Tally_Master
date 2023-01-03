@@ -1389,9 +1389,9 @@ void setup()
 
   pinMode(LED_BUILTIN, OUTPUT);
 
-  // Configurem els pins BOTONS/LEDS
-  pinMode(BOTO_ROIG_PIN, INPUT_PULLUP);
-  pinMode(BOTO_VERD_PIN, INPUT_PULLUP);
+  // Configurem els pins POLSADORS/LEDS
+  pinMode(POLSADOR_ROIG_PIN, INPUT_PULLUP);
+  pinMode(POLSADOR_VERD_PIN, INPUT_PULLUP);
   pinMode(LED_ROIG_PIN, OUTPUT);
   pinMode(LED_VERD_PIN, OUTPUT);
 
