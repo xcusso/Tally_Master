@@ -60,8 +60,11 @@ bool debug = true;
 // Si Input6(bit 5)= ON -> QL
 // Si Input 4(bit 3) = ON i INPUT6(bit 5) = OFF -> VIA
 
-#define PORT_A "VIA"
-#define PORT_B "QL"
+// Per fer compatible amb més equips definim el equip amb un numero
+// 0 = TIELINE VIA
+// 1 = YAMAHA QL
+#define PORT_A "VIA" 
+#define PORT_B "QL" 
 
 // Define PINS
 // Botons i leds locals
@@ -108,6 +111,8 @@ PCF8575 GPEXTB(0x21);
 // uint8_t const GPOB_PIN[5] = {26, 27, 14, 12, 13};
 // uint8_t const GPOB_PIN[5] = {26, 27, 17, 16, 13}; // El 12 donava problemes al fer boot, el 14 treu PWM
 */
+
+
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -355,14 +360,13 @@ float readBateriaPercent()
   return percent;
 }
 
-void logica_gpo()
+void logica_GPO()
 {
   // Aquesta funció s'encarrega de vigilar que no s'enviin combinacions de GPO
   // contradictories i crein problemes.
   // Cal desenvolupar una logica per cada cas.
 
-  if PORT_B
-    = "QL"
+  if (PORT_B == "QL" )
     {
 
       /*
@@ -466,7 +470,7 @@ void escriure_gpo()
     if (debug)
     {
       Serial.print("GPOA PIN: ");
-      Serial.print(i2cSetClock);
+      Serial.print(i);
       Serial.print("Bit: ");
       Serial.println(GPOA[i]);
 
@@ -1118,7 +1122,7 @@ void llegir_gpi()
   for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
   {
 
-    if (PORT_A = "VIA")
+    if (PORT_A == "VIA")
     {
       GPIA[1][i] = !GPEXTA.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
       if (GPIA[0][i] != GPIA[1][i])
