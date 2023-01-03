@@ -35,7 +35,7 @@ Lectura valors reals bateria
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h> //Control neopixels
-#include "PC8757.h"            //Expansió I2C GPIO
+#include "PCF8575.h"            //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
 #define VERSIO "M1" // Versió del software
