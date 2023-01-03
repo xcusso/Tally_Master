@@ -283,7 +283,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="topnav">
-    <h3>ESP-NOW DASHBOARD</h3>
+    <h3>TALLY MASTER</h3>
   </div>
   <div class="content">
     <div class="cards">
@@ -344,14 +344,14 @@ void readDataToSend()
 // TODO Unificar lectura volts i convertir a nivells
 float readBateriaVolts()
 {
-  volt = random(0, 40); // = analogRead(BATTERY_PIN)
+  float volt = random(0, 40); // = analogRead(BATTERY_PIN)
   return volt;
 }
 
 // Simulem lectura percentatge bateria
 float readBateriaPercent()
 {
-  percent = random(0, 100);
+  uint8_t percent = random(0, 100);
   return percent;
 }
 
@@ -615,7 +615,7 @@ void logica_gpi()
   {
     Serial.println("GPI CHANGE");
   }
-  if ((PORT_A = "VIA") && (PORT_B = "QL"))
+  if ((PORT_A == "VIA") && (PORT_B == "QL"))
   /*
     VIA:
     GPO 0 -> LLUM
@@ -1250,7 +1250,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
       if (debug)
       {
         Serial.print("Tally ID = ");
-        Serial.println(fromSlave.id)
+        Serial.println(fromSlave.id);
             Serial.print("Funció  = ");
         Serial.println(fromSlave.funcio);
         Serial.print("Led roig = ");
@@ -1450,11 +1450,42 @@ void setup()
   server.begin();
   GPEXTA.begin();             // Arrenquem el modul extra de GPIO A
   GPEXTB.begin();             // Arrenquem el modul extra de GPIO B
-  for (int i = 0; i < 8; i++) // Definim els 8 primers bits com INPUT PULLUP
-  {
-    GPEXTA.pinMode(i, INPUT_PULLUP);
-    GPEXTB.pinMode(i, INPUT_PULLUP);
-  }
+
+  GPEXTA.pinMode(P0, INPUT_PULLUP);
+  GPEXTA.pinMode(P1, INPUT_PULLUP);
+  GPEXTA.pinMode(P2, INPUT_PULLUP);
+  GPEXTA.pinMode(P3, INPUT_PULLUP);
+  GPEXTA.pinMode(P4, INPUT_PULLUP);
+  GPEXTA.pinMode(P5, INPUT_PULLUP);
+  GPEXTA.pinMode(P6, INPUT_PULLUP);
+  GPEXTA.pinMode(P7, INPUT_PULLUP);
+  
+  GPEXTB.pinMode(P0, INPUT_PULLUP);
+  GPEXTB.pinMode(P1, INPUT_PULLUP);
+  GPEXTB.pinMode(P2, INPUT_PULLUP);
+  GPEXTB.pinMode(P3, INPUT_PULLUP);
+  GPEXTB.pinMode(P4, INPUT_PULLUP);
+  GPEXTB.pinMode(P5, INPUT_PULLUP);
+  GPEXTB.pinMode(P6, INPUT_PULLUP);
+  GPEXTB.pinMode(P7, INPUT_PULLUP);
+
+  GPEXTA.pinMode(P8, OUTPUT);
+  GPEXTA.pinMode(P9, OUTPUT);
+  GPEXTA.pinMode(P10, OUTPUT);
+  GPEXTA.pinMode(P11, OUTPUT);
+  GPEXTA.pinMode(P12, OUTPUT);
+  GPEXTA.pinMode(P13, OUTPUT);
+  GPEXTA.pinMode(P14, OUTPUT);
+  GPEXTA.pinMode(P15, OUTPUT);
+  
+  GPEXTB.pinMode(P8, OUTPUT);
+  GPEXTB.pinMode(P9, OUTPUT);
+  GPEXTB.pinMode(P10, OUTPUT);
+  GPEXTB.pinMode(P11, OUTPUT);
+  GPEXTB.pinMode(P12, OUTPUT);
+  GPEXTB.pinMode(P13, OUTPUT);
+  GPEXTB.pinMode(P14, OUTPUT);
+  GPEXTB.pinMode(P15, OUTPUT);
 
   for (int i = 8; i < 16; i++) // Definim els 8 ultims bits com OUTPUT
   {
