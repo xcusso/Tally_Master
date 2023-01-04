@@ -195,7 +195,7 @@ enum TipusFuncio
   CONDUCTOR,
   PRODUCTOR
 };
-TipusFuncio funcio_local = "LLUM";
+TipusFuncio funcio_local = LLUM;
 
 int counter = 0;
 
@@ -509,7 +509,7 @@ void escriure_matrix(uint8_t color)
 
 void logica_polsadors_locals()
 {
-  if (!mode_configuracio && funcio_local == "CONDUCTOR") // Si no estic en configuracio i SOC CONDUCTOR
+  if (!mode_configuracio && funcio_local == CONDUCTOR) // Si no estic en configuracio i SOC CONDUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
@@ -535,12 +535,12 @@ void logica_polsadors_locals()
       // Simulem GPO indicant GPI (simulem la QL)
       GPIB[1][1] = GPOB[1];
       GPIB[1][2] = GPOB[2];
-      GPI_CHANGE = true;
+      GPIB_CHANGE = true;
       //************* CAL ELIMINAR AIXO *********
     }
   }
 
-  if (!mode_configuracio && funcio_local == "PRODUCTOR") // SOC PRODUCTOR
+  if (!mode_configuracio && funcio_local == PRODUCTOR) // SOC PRODUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
@@ -571,7 +571,7 @@ void logica_polsadors_locals()
       // Simulem GPO indicant GPI (simulem la QL)
       GPIB[1][3] = GPOB[3];
       GPIB[1][4] = GPOB[4];
-      GPIBB_CHANGE = true;
+      GPIB_CHANGE = true;
       //************* CAL ELIMINAR AIXO *********
     }
   }
@@ -1147,7 +1147,7 @@ void llegir_gpi()
   // PORT B
   for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
   {
-    if (PORT_B = "QL") // QL va amb PULLUP Logica inversa
+    if (PORT_B == "QL") // QL va amb PULLUP Logica inversa
     {
       GPIB[1][i] = GPEXTB.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
       if (GPIB[0][i] != GPIB[1][i])
@@ -1455,41 +1455,11 @@ void setup()
   GPEXTA.begin();             // Arrenquem el modul extra de GPIO A
   GPEXTB.begin();             // Arrenquem el modul extra de GPIO B
 
-  GPEXTA.pinMode(P0, INPUT_PULLUP);
-  GPEXTA.pinMode(P1, INPUT_PULLUP);
-  GPEXTA.pinMode(P2, INPUT_PULLUP);
-  GPEXTA.pinMode(P3, INPUT_PULLUP);
-  GPEXTA.pinMode(P4, INPUT_PULLUP);
-  GPEXTA.pinMode(P5, INPUT_PULLUP);
-  GPEXTA.pinMode(P6, INPUT_PULLUP);
-  GPEXTA.pinMode(P7, INPUT_PULLUP);
-  
-  GPEXTB.pinMode(P0, INPUT_PULLUP);
-  GPEXTB.pinMode(P1, INPUT_PULLUP);
-  GPEXTB.pinMode(P2, INPUT_PULLUP);
-  GPEXTB.pinMode(P3, INPUT_PULLUP);
-  GPEXTB.pinMode(P4, INPUT_PULLUP);
-  GPEXTB.pinMode(P5, INPUT_PULLUP);
-  GPEXTB.pinMode(P6, INPUT_PULLUP);
-  GPEXTB.pinMode(P7, INPUT_PULLUP);
-
-  GPEXTA.pinMode(P8, OUTPUT);
-  GPEXTA.pinMode(P9, OUTPUT);
-  GPEXTA.pinMode(P10, OUTPUT);
-  GPEXTA.pinMode(P11, OUTPUT);
-  GPEXTA.pinMode(P12, OUTPUT);
-  GPEXTA.pinMode(P13, OUTPUT);
-  GPEXTA.pinMode(P14, OUTPUT);
-  GPEXTA.pinMode(P15, OUTPUT);
-  
-  GPEXTB.pinMode(P8, OUTPUT);
-  GPEXTB.pinMode(P9, OUTPUT);
-  GPEXTB.pinMode(P10, OUTPUT);
-  GPEXTB.pinMode(P11, OUTPUT);
-  GPEXTB.pinMode(P12, OUTPUT);
-  GPEXTB.pinMode(P13, OUTPUT);
-  GPEXTB.pinMode(P14, OUTPUT);
-  GPEXTB.pinMode(P15, OUTPUT);
+for (int i = 0; i < 8; i++) // Definim els 8 primers bits com INPUT PULLUP
+  {
+    GPEXTA.pinMode(i, INPUT_PULLUP);
+    GPEXTB.pinMode(i, INPUT_PULLUP);
+  }
 
   for (int i = 8; i < 16; i++) // Definim els 8 ultims bits com OUTPUT
   {
