@@ -195,7 +195,7 @@ enum TipusFuncio
   CONDUCTOR,
   PRODUCTOR
 };
-TipusFuncio funcio_local = LLUM;
+TipusFuncio funcio_local = "LLUM";
 
 int counter = 0;
 
@@ -462,7 +462,7 @@ void escriure_gpo()
 
   logica_GPO(); // Filtre per enviar només un GPO i fer logica Mute COND
 
-  // Enviament GPOA (VIA)
+
   for (uint8_t i = 8; i < 16; i++)
   {
     GPEXTA.digitalWrite(i, GPOA[i]);
