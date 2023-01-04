@@ -22,6 +22,8 @@ Lectura valors reals bateria
 /*
   Basat en:
 
+https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
+
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/?s=esp-now
   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
@@ -172,7 +174,7 @@ bool mode_configuracio = false;          // Mode configuració
 
 // Replace with your network credentials (STATION)
 const char *ssid = "exteriors";
-const char *password = "exteriors";
+const char *password = "exteriors#";
 // TODO: Poder seleccionar via WEB la Wifi on connectar.
 
 esp_now_peer_info_t slave;
@@ -284,6 +286,8 @@ const char index_html[] PROGMEM = R"rawliteral(
     .packet { color: #bebebe; }
     .card.temperature { color: #fd7e14; }
     .card.humidity { color: #1b78e2; }
+    .card.operativa { color: #fd7e14; }
+    .card.estat { color: #1b78e2; }
   </style>
 </head>
 <body>
@@ -292,14 +296,20 @@ const char index_html[] PROGMEM = R"rawliteral(
   </div>
   <div class="content">
     <div class="cards">
+      <div class="card operativa">
+        <h4> TALLY 1 - OPERACIO</h4><p><span class="reading"><span id="f1"></span><span id="br1"></span><span id="bv1"></span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
+      </div>
+      <div class="card estat">
+        <h4> TALLY 1 - BATERIA</h4><p><span class="reading"><span id="h1"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="rh1"></span></p>
+      </div>
       <div class="card temperature">
-        <h4><i class="fas fa-thermometer-half"></i> BOARD #1 - TEMPERATURE</h4><p><span class="reading"><span id="t1"></span> &deg;C</span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
+        <h4><i class="fas fa-thermometer-half"></i> TALLY 1 </h4><p><span class="reading"><span id="t1"></span> &deg;C</span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
       </div>
       <div class="card humidity">
         <h4><i class="fas fa-tint"></i> BOARD #1 - HUMIDITY</h4><p><span class="reading"><span id="h1"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="rh1"></span></p>
       </div>
       <div class="card temperature">
-        <h4><i class="fas fa-thermometer-half"></i> BOARD #2 - TEMPERATURE</h4><p><span class="reading"><span id="t2"></span> &deg;C</span></p><p class="packet">Reading ID: <span id="rt2"></span></p>
+        <h4><i class="fas fa-thermometer-half"></i> TALLY 2</h4><p><span class="reading"><span id="t2"></span> &deg;C</span></p><p class="packet">Reading ID: <span id="rt2"></span></p>
       </div>
       <div class="card humidity">
         <h4><i class="fas fa-tint"></i> BOARD #2 - HUMIDITY</h4><p><span class="reading"><span id="h2"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="rh2"></span></p>
@@ -331,10 +341,24 @@ if (!!window.EventSource) {
   document.getElementById("rt"+obj.id).innerHTML = obj.readingId;
   document.getElementById("rh"+obj.id).innerHTML = obj.readingId;
  }, false);
+
+ source.addEventListener('new_operativa', function(e) {
+  console.log("new_operativa", e.data);
+  var obj = JSON.parse(e.data);
+  document.getElementById("f"+obj.id).innerHTML = obj.funcio.toFixed(2);
+  document.getElementById("br"+obj.id).innerHTML = obj.boto_roig.toFixed(2);
+  document.getElementById("bv"+obj.id).innerHTML = obj.boto_verd.toFixed(2);
+ }, false);
 }
 </script>
 </body>
 </html>)rawliteral";
+
+/* Notes
+obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius arriben.
+Per imprimir la variable posem el nom de la variable seguit del numero de registre (que no sé d'on el treu...)
+*/
+
 
 void readDataToSend()
 {
@@ -1251,6 +1275,16 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 
     case TALLY: // Missatge del SLAVE TALLY
       memcpy(&fromSlave, incomingData, sizeof(fromSlave));
+      // create a JSON document with received data and send it by event to the web page
+      root["id"] = fromSlave.id;
+      root["funcio"] = fromSlave.funcio;
+      root["boto_roig"] = fromSlave.polsador_roig;
+      root["boto_verd"] = fromSlave.polsador_verd;
+      serializeJson(root, payload);
+      Serial.print("event send :");
+      serializeJson(root, Serial);
+      events.send(payload.c_str(), "new_operativa", millis());
+      Serial.println();
       if (debug)
       {
         Serial.print("Tally ID = ");
@@ -1399,16 +1433,16 @@ void setup()
   pinMode(LED_ROIG_PIN, OUTPUT);
   pinMode(LED_VERD_PIN, OUTPUT);
 
-  Serial.println("ESP32 TALLY MASTER");
-  Serial.print("Versió: ");
+  Serial.println("TALLY MASTER");
+  Serial.print("Versio: ");
   Serial.println(VERSIO);
   Serial.print("Server MAC Address:  ");
   Serial.println(WiFi.macAddress());
 
   lcd.setCursor(0,0); // Situem cursor primer caracter, primera linea
-  lcd.print("ESP32 TALLY MASTER");
+  lcd.print("TALLY MASTER");
   lcd.setCursor(0,1); // Primer caracter, segona linea
-  lcd.print("Versió: ");
+  lcd.print("Versio: ");
   lcd.setCursor(9,1); // Caracter 9, segona linea
   lcd.print(VERSIO);
 
