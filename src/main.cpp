@@ -260,11 +260,11 @@ typedef struct struct_pairing
 typedef struct struct_message_to_slave
 {
   uint8_t msgType;
-  uint8_t funcio;      // Identificador de la funcio del tally
-  bool led_roig;       // llum confirmació cond polsador vermell
-  bool led_verd;       // llum confirmació cond polsador verd
-  uint8_t color_tally; // Color indexat del tally
-  uint8_t text_2       // text per mostrar a pantalla
+  // Borrar - No cal funcio uint8_t funcio;      // Identificador de la funcio del tally
+  bool led_roig[3];       // Array LLUM, COND, PROD llum confirmació cond polsador vermell
+  bool led_verd[3];       // Array LLUM, COND, PROD llum confirmació cond polsador verd
+  uint8_t color_tally[3]; // Array LLUM, COND, PROD Color indexat del tally
+  uint8_t text_2[3]       // Array LLUM, COND, PROD text per mostrar a pantalla
 } struct_message_to_slave;
 
 // Estrucrtura dades rebuda de slaves
