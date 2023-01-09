@@ -40,7 +40,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include "PCF8575.h"           //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
-#define VERSIO "M1" // Versió del software
+#define VERSIO "M1.1" // Versió del software
 
 // Bool per veure missatges de debug
 bool debug = true;
@@ -264,7 +264,7 @@ typedef struct struct_message_to_slave
   bool led_roig;       // llum confirmació cond polsador vermell
   bool led_verd;       // llum confirmació cond polsador verd
   uint8_t color_tally; // Color indexat del tally
-  // text per mostrar a pantalla
+  uint8_t text_2       // text per mostrar a pantalla
 } struct_message_to_slave;
 
 // Estrucrtura dades rebuda de slaves
@@ -399,6 +399,30 @@ void readDataToSend()
   outgoingSetpoints.temp = random(0, 40);
   outgoingSetpoints.hum = random(0, 100);
   outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
+}
+
+
+// AQUI CAL ARREGLAR MOLTES COSES
+void comunicar_slaves(TipusFuncio funcio_to_slave)
+{
+  toSlave.msgType = TALLY;
+  toSlave.id = 0; // Servidor te el 0
+  toSlave.funcio = funcio_to_slave; // Aixo no esta gaire be
+  toSlave.led_roig = valor;
+  toSlave.led_verd = valor;
+  toSlave.color_tally = color;
+  toSlave.text_2 = text2;
+
+  // Send message via ESP-NOW
+  esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
+  if (result == ESP_OK)
+  {
+    Serial.println("Sent polsadors with success");
+  }
+  else
+  {
+    Serial.println("Error sending to slave data");
+  }
 }
 
 // Simulem lectura de bateria
@@ -537,12 +561,20 @@ void escriure_GPO()
   }
 }
 
-void escriure_display(uint8_t txt1, uint8_t txt2, uint8_t time_clock)
+void escriure_display_1(uint8_t txt1)
 {
   lcd.setCursor(0, 0); // Situem cursor primer caracter, primera linea
   lcd.print(TEXT_1[txt1]);
+}
+
+void escriure_display_2(uint8_t txt2)
+{
   lcd.setCursor(0, 1); // Primer caracter, segona linea
   lcd.print(TEXT_2[txt2]);
+}
+
+void escriure_display_clock(uint8_t temps_clock)
+{
   lcd.setCursor(9, 0);   // Caracter 9, primera linea
   lcd.print("HH:MM:SS"); // TODO -> POSAR TEMPS
 }
@@ -1577,9 +1609,9 @@ void loop()
     // Preparar color local matrix
     escriure_matrix(color_matrix[funcio_local_num]);
     // Preparar variables display
-    escriure_display(display_text_1[funcio_local_num], display_text_2[funcio_local_num], 0); // TODO Passar la hora
+    escriure_display_2(display_text_2[funcio_local_num]); // TODO Passar la hora
     // data TALLY SEND
-    
+    comunicar_slaves(); // Enviem les dades rebudes als slaves
   }
 
   static unsigned long lastEventTime = millis();
