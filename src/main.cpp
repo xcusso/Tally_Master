@@ -176,6 +176,8 @@ bool mode_configuracio = false;          // Mode configuració
 uint8_t TEXT_LLUM = 0;
 uint8_t TEXT_COND = 0;
 uint8_t TEXT_PROD = 0;
+uint8_t local_text_1 = 0;
+uint8_t local_text_2 = 0;
 
 //     TEXT_1[] = "12345678""90123456"
 //                          "HH:MM:SS"
@@ -544,6 +546,14 @@ void escriure_GPO()
   }
 }
 
+void escriure_display() {
+  lcd.setCursor(0,0); // Situem cursor primer caracter, primera linea
+  lcd.print(TEXT_1[local_text_1]);
+  lcd.setCursor(0,1); // Primer caracter, segona linea
+  lcd.print(TEXT_2[local_text_2]);
+  lcd.setCursor(9,0); // Caracter 9, primera linea
+  lcd.print("HH:MM:SS");
+}
 // Posar llum a un color
 void escriure_matrix(uint8_t color)
 {
@@ -1387,6 +1397,9 @@ void Menu_configuracio()
   // Desenvolupar aqui el mode configuració
   // TODO:  Seleccionar entre LLUM, CONDUCTOR i PRODUCTOR
   // Veure com generem menu
+
+  // Dibuixem MENU A DISPLAY
+  // Llegim polsador verd = anterior Vermell = endavant
   /*
   Si opcio 1
     funcio_local = LLUM;
@@ -1542,14 +1555,25 @@ for (int i = 0; i < 8; i++) // Definim els 8 primers bits com INPUT PULLUP
 
 void loop()
 {
+  llegir_polsadors(); // Llegeix el valor dels polsadors
+  if (LOCAL_CHANGE) { // Si hem apretat algun polsador
+    detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
+      if (mode_configuracio) { // Hem entrat en mode CONFIG
+        Menu_configuracio(); // Anem al menu config
+      } else {
+        logica_polsadors_locals(); // Apliquem la lógica polsadors locals
+        escriure_GPO(); // Escrivim els GPO (inclou logica GPO)
+      }
+  } 
   static unsigned long lastEventTime = millis();
   static const unsigned long EVENT_INTERVAL_MS = 5000; // Envia cada 5 segons informació
   // Cal canviar el loop per fer-lo quan es rebi un GPIO
   if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
   {
-    events.send("ping", NULL, millis());
+    events.send("ping", NULL, millis()); //Actualitza la web
     lastEventTime = millis();
     readDataToSend();
-    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints));
+    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
   }
+
 }
