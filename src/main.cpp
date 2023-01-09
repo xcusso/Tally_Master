@@ -172,6 +172,44 @@ const unsigned long temps_config = 5000; // Temps per disparar opció config
 bool pre_mode_configuracio = false;      // Inici mode configuració
 bool mode_configuracio = false;          // Mode configuració
 
+// Text linea 2 que envia MASTER
+uint8_t TEXT_LLUM = 0;
+uint8_t TEXT_COND = 0;
+uint8_t TEXT_PROD = 0;
+
+//     TEXT_1[] = "12345678""90123456"
+//                          "HH:MM:SS"
+//                          "NO CLOCK"
+String TEXT_1[] = {"       ", //0
+                   " TALLY ", //1
+                   " COND  ", //2
+                   " PROD  ", //3
+                   "CONFIG:", //4
+                   "NO LINK"}; //5
+
+//     TEXT_2[] = "1234567890123456"
+String TEXT_2[] = {"                ", //0  
+                   " FORA DE SERVEI ", //1
+                   " ERROR GPI VIA  ", //2
+                   "  ERROR GPI QL  ", //3
+                   "**** ON AIR ****", //4
+                   "ORD PROD A COND ", //5
+                   "ORD DE PRODUCTOR", //6
+                   "ORD A CONDUCTOR ", //7
+                   "ORD COND A PROD ", //8
+                   "ORD DE CONDUCTOR", //9
+                   "ORD A PRODUCTOR ", //10
+                   "ORD PROD A ESTUD", //11
+                   "ORDRES A ESTUDI ", //12
+                   "ORD COND A ESTUD", //13
+                   "TANCAT LOCALMENT", //14
+                   "TANCAT DE ESTUDI", //15
+                   "  MICRO TANCAT  ", //16
+                   "* ON AIR LOCAL *", //17
+                   "<MODE TALLY    >", //18
+                   "<MODE PRODUCTOR>", //19
+                   "<MODE CONDUCTOR>"}; //20
+
 // Replace with your network credentials (STATION)
 const char *ssid = "exteriors";
 const char *password = "exteriors#";
@@ -356,7 +394,7 @@ if (!!window.EventSource) {
 
 /* Notes
 obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius arriben.
-Per imprimir la variable posem el nom de la variable seguit del numero de registre (que no sé d'on el treu...)
+Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
 */
 
 
@@ -477,7 +515,7 @@ void logica_GPO()
     }
 }
 
-void escriure_gpo()
+void escriure_GPO()
 {
   // Que passa si apretem tots els polsadors alhora. La QL intententara carregar 4
   // memories al mateix temps -> Cosa que la pot liar parda.
@@ -668,9 +706,9 @@ void logica_gpi()
       // SI tenim més de una confirmació simultanea el sistema falla
       // DONAREM ERRROR I APAGUAREM TALLYS
       {
-        // TEXT_LLUM = "ERROR GPI QL"
-        // TEXT_COND = "ERROR GPI QL"
-        // TEXT_PROD = "ERROR GPI QL"
+        TEXT_LLUM = 3; //"  ERROR GPI QL  "
+        TEXT_COND = 3; //"  ERROR GPI QL  "
+        TEXT_PROD = 3; //"  ERROR GPI QL  "
         color_matrix_llum = 0; // Negre (LLUM)
         color_matrix_cond = 0; // Negre (CONDUCTOR)
         color_matrix_prod = 0; // Negre (PRODUCTOR)
@@ -680,7 +718,7 @@ void logica_gpi()
         led_verd_productor = false;
         if (debug)
         {
-          Serial.println(" A + B + ON AIR + MIC ON");
+          Serial.println("Falla QL A + B + ON AIR + MIC ON");
         }
       }
       else
@@ -698,9 +736,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si notenim cap confirmació d'ordres
-              // TEXT_LLUM = "ON AIR"
-              // TEXT_COND = "ON AIR"
-              // TEXT_PROD = "ON AIR"
+              TEXT_LLUM = 4; //"**** ON AIR ****"
+              TEXT_COND = 4; //"**** ON AIR ****"
+              TEXT_PROD = 4; //"**** ON AIR ****"
               color_matrix_llum = 1; // Vermell (LLUM)
               color_matrix_cond = 1; // Vermell (CONDUCTOR)
               color_matrix_prod = 1; // Vermell (PRODUCTOR)
@@ -716,9 +754,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres PROD A CONDUCTOR
-              // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
-              // TEXT_COND = "ORDRES DEL PRODUCTOR"
-              // TEXT_PROD = "ORDRES A CONDUCTOR"
+              TEXT_LLUM = 5; //"ORD PROD A COND ", //5
+              TEXT_COND = 6; //"ORD DE PRODUCTOR", //6
+              TEXT_PROD = 7; //"ORD A CONDUCTOR ", //7
               color_matrix_llum = 1; // Vermell (LLUM)
               color_matrix_cond = 1; // Vermell (CONDUCTOR)
               color_matrix_prod = 1; // Blau (PRODUCTOR)
@@ -734,9 +772,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
             {
               // Si tenim confirmació ordres PROD A ESTUDI
-              // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
-              // TEXT_COND = "ON AIR"
-              // TEXT_PROD = "ORDRES A ESTUDI"
+              TEXT_LLUM = 11; //"ORD PROD A ESTUD", //11
+              TEXT_COND = 4;  //"**** ON AIR ****", //4
+              TEXT_PROD = 12; //"ORDRES A ESTUDI ", //12
               color_matrix_llum = 1; // Vermell (LLUM)
               color_matrix_cond = 1; // Vermell (CONDUCTOR)
               color_matrix_prod = 3; // Cel (PRODUCTOR)
@@ -756,9 +794,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si no tenim cap ordre Nomes micro tancat a QL
-              // TEXT_LLUM = "TANCAT DES DE TAULA"
-              // TEXT_COND = "TANCAT DES DE TAULA"
-              // TEXT_PROD = "TANCAT DES DE TAULA"
+              TEXT_LLUM = 14; //"TANCAT LOCALMENT", //14
+              TEXT_COND = 14; //"TANCAT LOCALMENT", //14
+              TEXT_PROD = 14; //"TANCAT LOCALMENT", //14
               color_matrix_llum = 6; // Taronja (LLUM)
               color_matrix_cond = 6; // Taronja (CONDUCTOR)
               color_matrix_prod = 6; // Taronja (PRODUCTOR)
@@ -774,9 +812,9 @@ void logica_gpi()
             if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres COND A PROD
-              // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
-              // TEXT_COND = "ORDRES A PRODUCTOR"
-              // TEXT_PROD = "ON AIR"
+              TEXT_LLUM = 8;  //"ORD COND A PROD ", //8
+              TEXT_COND = 10; //"ORD A PRODUCTOR ", //10
+              TEXT_PROD = 9;  //"ORD DE CONDUCTOR", //9
               color_matrix_llum = 1; // Vermell (LLUM)
               color_matrix_cond = 2; // Blau (CONDUCTOR)
               color_matrix_prod = 1; // Vermell (PRODUCTOR)
@@ -792,9 +830,9 @@ void logica_gpi()
             if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres COND A ESTU
-              // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
-              // TEXT_COND = "ORDRES A ESTUDI"
-              // TEXT_PROD = "ON AIR"
+              TEXT_LLUM = 13; //"ORD COND A ESTUD", //13
+              TEXT_COND = 12; //"ORDRES A ESTUDI ", //12
+              TEXT_PROD = 4;  //"**** ON AIR ****", //4
               color_matrix_llum = 1; // Vermell (LLUM)
               color_matrix_cond = 3; // Cel (CONDUCTOR)
               color_matrix_prod = 1; // Vermell (PRODUCTOR)
@@ -819,9 +857,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si notenim cap confirmació d'ordres
-              // TEXT_LLUM = "TANCAT DES ESTUDI"
-              // TEXT_COND = "TANCAT DES ESTUDI"
-              // TEXT_PROD = "TANCAT DES ESTUDI"
+              TEXT_LLUM = 15; //"TANCAT DE ESTUDI", //15
+              TEXT_COND = 15; //"TANCAT DE ESTUDI", //15
+              TEXT_PROD = 15; //"TANCAT DE ESTUDI", //15
               color_matrix_llum = 5; // Groc (LLUM)
               color_matrix_cond = 5; // Groc (CONDUCTOR)
               color_matrix_prod = 5; // Groc (PRODUCTOR)
@@ -837,9 +875,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres PROD A CONDUCTOR
-              // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
-              // TEXT_COND = "ORDRES DEL PRODUCTOR"
-              // TEXT_PROD = "ORDRES A CONDUCTOR"
+              TEXT_LLUM = 5; //"ORD PROD A COND ", //5
+              TEXT_COND = 6; //"ORD DE PRODUCTOR", //6
+              TEXT_PROD = 7; //"ORD A CONDUCTOR ", //7
               color_matrix_llum = 5; // Groc (LLUM)
               color_matrix_cond = 5; // Groc (CONDUCTOR)
               color_matrix_prod = 1; // Blau (PRODUCTOR)
@@ -855,9 +893,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
             {
               // Si tenim confirmació ordres PROD A ESTUDI
-              // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
-              // TEXT_COND = "ON AIR"
-              // TEXT_PROD = "ORDRES A ESTUDI"
+              TEXT_LLUM = 11; //"ORD PROD A ESTUD", //11
+              TEXT_COND = 4;  //"**** ON AIR ****", //4
+              TEXT_PROD = 12; //"ORDRES A ESTUDI ", //12
               color_matrix_llum = 3; // Groc (LLUM)
               color_matrix_cond = 3; // Groc (CONDUCTOR)
               color_matrix_prod = 3; // Cel (PRODUCTOR)
@@ -877,9 +915,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si no tenim cap ordre Nomes micro tancat a QL
-              // TEXT_LLUM = "TANCAT"
-              // TEXT_COND = "TANCAT"
-              // TEXT_PROD = "TANCAT"
+              TEXT_LLUM = 16; //"  MICRO TANCAT  "; //16
+              TEXT_COND = 16; //"  MICRO TANCAT  "; //16
+              TEXT_PROD = 16; //"  MICRO TANCAT  "; //16
               color_matrix_llum = 7; // Blanc (LLUM)
               color_matrix_cond = 7; // Blanc (CONDUCTOR)
               color_matrix_prod = 7; // Blanc (PRODUCTOR)
@@ -895,9 +933,9 @@ void logica_gpi()
             if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres COND A PROD
-              // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
-              // TEXT_COND = "ORDRES A PRODUCTOR"
-              // TEXT_PROD = "ON AIR"
+              TEXT_LLUM = 8;  //"ORD COND A PROD ", //8
+              TEXT_COND = 10; //"ORD A PRODUCTOR ", //10
+              TEXT_PROD = 9;  //"ORD DE CONDUCTOR", //9
               color_matrix_llum = 7; // Blanc (LLUM)
               color_matrix_cond = 2; // Blau (CONDUCTOR)
               color_matrix_prod = 7; // Blanc (PRODUCTOR)
@@ -913,9 +951,9 @@ void logica_gpi()
             if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres COND A ESTU
-              // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
-              // TEXT_COND = "ORDRES A ESTUDI"
-              // TEXT_PROD = "ON AIR"
+              TEXT_LLUM = 13; //"ORD COND A ESTUD", //13
+              TEXT_COND = 12; //"ORDRES A ESTUDI ", //12
+              TEXT_PROD = 16; //"  MICRO TANCAT  "; //16
               color_matrix_llum = 7; // Blanc (LLUM)
               color_matrix_cond = 3; // Cel (CONDUCTOR)
               color_matrix_prod = 7; // Blanc (PRODUCTOR)
@@ -942,9 +980,9 @@ void logica_gpi()
       // SI tenim més de una confirmació simultanea el sistema falla
       // DONAREM ERRROR I APAGUAREM TALLYS
       {
-        // TEXT_LLUM = "ERROR GPI QL"
-        // TEXT_COND = "ERROR GPI QL"
-        // TEXT_PROD = "ERROR GPI QL"
+        TEXT_LLUM = 3; //"  ERROR GPI QL  ", //3
+        TEXT_COND = 3; //"  ERROR GPI QL  ", //3
+        TEXT_PROD = 3; //"  ERROR GPI QL  ", //3
         color_matrix_llum = 0; // Negre (LLUM)
         color_matrix_cond = 0; // Negre (CONDUCTOR)
         color_matrix_prod = 0; // Negre (PRODUCTOR)
@@ -954,7 +992,7 @@ void logica_gpi()
         led_verd_productor = false;
         if (debug)
         {
-          Serial.println(" A + B + ON AIR + MIC ON");
+          Serial.println("Falla  A + B + ON AIR + MIC ON");
         }
       }
       else
@@ -968,9 +1006,9 @@ void logica_gpi()
           if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
           {
             // Si notenim cap confirmació d'ordres
-            // TEXT_LLUM = "ON AIR"
-            // TEXT_COND = "ON AIR"
-            // TEXT_PROD = "ON AIR"
+            TEXT_LLUM = 17; // "* ON AIR LOCAL *", //17
+            TEXT_COND = 17; // "* ON AIR LOCAL *", //17
+            TEXT_PROD = 17; // "* ON AIR LOCAL *", //17
             color_matrix_llum = 4; // Verd (LLUM)
             color_matrix_cond = 4; // Verd (CONDUCTOR)
             color_matrix_prod = 4; // Verd (PRODUCTOR)
@@ -986,9 +1024,9 @@ void logica_gpi()
           if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
           {
             // Si tenim confirmació ordres PROD A CONDUCTOR
-            // TEXT_LLUM = "ORDRES PRODUCTOR A CONDUCTOR"
-            // TEXT_COND = "ORDRES DEL PRODUCTOR"
-            // TEXT_PROD = "ORDRES A CONDUCTOR"
+            TEXT_LLUM = 5; //"ORD PROD A COND ", //5
+            TEXT_COND = 6; //"ORD DE PRODUCTOR", //6
+            TEXT_PROD = 7; //"ORD A CONDUCTOR ", //7
             color_matrix_llum = 4; // Verd (LLUM)
             color_matrix_cond = 4; // Verd (CONDUCTOR)
             color_matrix_prod = 2; // Blau (PRODUCTOR)
@@ -1004,9 +1042,9 @@ void logica_gpi()
           if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
           {
             // Si tenim confirmació ordres PROD A ESTUDI
-            // TEXT_LLUM = "ORDRES PRODUCTOR A ESTUDI"
-            // TEXT_COND = "ON AIR"
-            // TEXT_PROD = "ORDRES A ESTUDI"
+            TEXT_LLUM = 11; // "ORD PROD A ESTUD", //11
+            TEXT_COND = 17; // "* ON AIR LOCAL *", //17
+            TEXT_PROD = 12; // "ORDRES A ESTUDI ", //12
             color_matrix_llum = 4; // Verd (LLUM)
             color_matrix_cond = 4; // Verd (CONDUCTOR)
             color_matrix_prod = 3; // Cel (PRODUCTOR)
@@ -1026,9 +1064,9 @@ void logica_gpi()
           if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
           {
             // Si no tenim cap ordre Nomes micro tancat a QL
-            // TEXT_LLUM = "TANCAT DES DE TAULA"
-            // TEXT_COND = "TANCAT DES DE TAULA"
-            // TEXT_PROD = "TANCAT DES DE TAULA"
+            TEXT_LLUM = 14; //"TANCAT LOCALMENT", //14
+            TEXT_COND = 14; //"TANCAT LOCALMENT", //14
+            TEXT_PROD = 14; //"TANCAT LOCALMENT", //14
             color_matrix_llum = 6; // Taronja (LLUM)
             color_matrix_cond = 6; // Taronja (CONDUCTOR)
             color_matrix_prod = 6; // Taronja (PRODUCTOR)
@@ -1044,9 +1082,9 @@ void logica_gpi()
           if (GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
           {
             // Si tenim confirmació ordres COND A PROD
-            // TEXT_LLUM = "ORDRES CONDUCTOR A PRODUCTOR"
-            // TEXT_COND = "ORDRES A PRODUCTOR"
-            // TEXT_PROD = "ON AIR"
+            TEXT_LLUM = 8; // "ORD COND A PROD ", //8
+            TEXT_COND = 10; //"ORD A PRODUCTOR ", //10
+            TEXT_PROD = 9; // "ORD DE CONDUCTOR", //9
             color_matrix_llum = 4; // Verd (LLUM)
             color_matrix_cond = 2; // Blau (CONDUCTOR)
             color_matrix_prod = 4; // Verd (PRODUCTOR)
@@ -1062,9 +1100,9 @@ void logica_gpi()
           if (!GPIB[0][1] && GPIB[0][2] && !GPIB[0][3] && !GPIB[0][4])
           {
             // Si tenim confirmació ordres COND A ESTU
-            // TEXT_LLUM = "ORDRES CONDUCTOR A ESTUDI"
-            // TEXT_COND = "ORDRES A ESTUDI"
-            // TEXT_PROD = "ON AIR"
+            TEXT_LLUM = 13; //"ORD COND A ESTUD", //13
+            TEXT_COND = 12; //"ORDRES A ESTUDI ", //12
+            TEXT_PROD = 17; //"* ON AIR LOCAL *", //17
             color_matrix_llum = 4; // Verd (LLUM)
             color_matrix_cond = 3; // Cel (CONDUCTOR)
             color_matrix_prod = 4; // Verd (PRODUCTOR)
@@ -1086,9 +1124,9 @@ void logica_gpi()
       // Presencia de VIA PERO NO DE QL ========================================
       if (GPIA[0][0])
       {
-        // TEXT_LLUM = "ON AIR"
-        // TEXT_COND = "ON AIR"
-        // TEXT_PROD = "ON AIR"
+        TEXT_LLUM = 4; // "**** ON AIR ****", //4
+        TEXT_COND = 4; // "**** ON AIR ****", //4
+        TEXT_PROD = 4; // "**** ON AIR ****", //4
         color_matrix_llum = 1; // Vermell (LLUM)
         color_matrix_cond = 1; // Vermell (CONDUCTOR)
         color_matrix_prod = 1; // Vermell (PRODUCTOR)
@@ -1103,9 +1141,9 @@ void logica_gpi()
       }
       else
       {
-        // TEXT_LLUM = "TANCAT"
-        // TEXT_COND = "TANCAT"
-        // TEXT_PROD = "TANCAT"
+        TEXT_LLUM = 15; // "TANCAT DE ESTUDI", //15
+        TEXT_COND = 15; // "TANCAT DE ESTUDI", //15
+        TEXT_PROD = 15; // "TANCAT DE ESTUDI", //15
         color_matrix_llum = 7; // Blanc (LLUM)
         color_matrix_cond = 7; // Blanc (CONDUCTOR)
         color_matrix_prod = 7; // Blanc (PRODUCTOR)
@@ -1122,9 +1160,9 @@ void logica_gpi()
 
     if (!GPIA[0][3] && !GPIB[0][5])
     {
-      // TEXT_LLUM = "FORA DE SERVEI"
-      // TEXT_COND = "FORA DE SERVEI"
-      // TEXT_PROD = "FORA DE SERVEI"
+      TEXT_LLUM = 1; // " FORA DE SERVEI ", //1
+      TEXT_COND = 1; // " FORA DE SERVEI ", //1
+      TEXT_PROD = 1; // " FORA DE SERVEI ", //1
       color_matrix_llum = 0; // NEGRE (LLUM)
       color_matrix_cond = 0; // NEGRE (CONDUCTOR)
       color_matrix_prod = 0; // NEGRE (PRODUCTOR)
