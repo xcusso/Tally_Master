@@ -75,6 +75,7 @@ bool debug = true;
 #define LED_ROIG_PIN 17
 #define LED_VERD_PIN 18
 #define MATRIX_PIN 4
+#define DEBOUNCE_DELAY 100 // Delay debouncer
 
 // Define Quantitat de leds
 #define LED_COUNT 72 // 8x8 + 8
@@ -134,6 +135,11 @@ uint8_t color_matrix[] = {0, 0, 0}; // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 LiquidCrystal_I2C lcd(0x27, 16, 2); // 0x27 adreça I2C 16 = Caracters 2= Linees
 
 // Variables
+bool debouncing_roig = false; // Flag debouncing
+bool debouncing_verd = false; // Flag debouncing
+unsigned long last_time_roig; // Temps debouncing roig
+unsigned long last_time_verd; // Temps debouncing verd
+
 // Fem arrays de dos valors la 0 és anterior la 1 actual
 bool POLSADOR_LOCAL_ROIG[] = {false, false};
 bool POLSADOR_LOCAL_VERD[] = {false, false};
@@ -141,10 +147,8 @@ bool POLSADOR_LOCAL_VERD[] = {false, false};
 // Valor dels leds (dels polsadors)
 bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
-bool led_roig_conductor = false;
-bool led_verd_conductor = false;
-bool led_roig_productor = false;
-bool led_verd_productor = false;
+bool led_roig[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
+bool led_verd[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
 uint16_t BATTERY_LOCAL_READ[] = {0, 0};
 
 // Variables GPIO
@@ -164,9 +168,11 @@ bool GPIB_CHANGE = false;  // Per saber si hi han canvis en el GPIB
 bool LOCAL_CHANGE = false; // Per saber si alguna cosa local ha canviat
 
 unsigned long temps_set_config = 0;      // Temps que ha d'estar apretat per configuracio
-const unsigned long temps_config = 5000; // Temps per disparar opció config
+const unsigned long temps_config = 3000; // Temps per disparar opció config
+unsigned long temps_set_config_post = 0; // Temps per sortir config
 bool pre_mode_configuracio = false;      // Inici mode configuració
 bool mode_configuracio = false;          // Mode configuració
+bool post_mode_configuracio = false;     // Final configuració
 
 // Text linea 2 que envia MASTER
 uint8_t display_text_1[] = {0, 0, 0}; // Primera linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
@@ -202,8 +208,8 @@ String TEXT_2[] = {"                ",  // 0
                    "  MICRO TANCAT  ",  // 16
                    "* ON AIR LOCAL *",  // 17
                    "<MODE TALLY    >",  // 18
-                   "<MODE PRODUCTOR>",  // 19
-                   "<MODE CONDUCTOR>"}; // 20
+                   "<MODE CONDUCTOR>",  // 19
+                   "<MODE PRODUCTOR>"}; // 20
 
 // Replace with your network credentials (STATION)
 const char *ssid = "exteriors";
@@ -264,7 +270,7 @@ typedef struct struct_message_to_slave
   bool led_roig[3];       // Array LLUM, COND, PROD llum confirmació cond polsador vermell
   bool led_verd[3];       // Array LLUM, COND, PROD llum confirmació cond polsador verd
   uint8_t color_tally[3]; // Array LLUM, COND, PROD Color indexat del tally
-  uint8_t text_2[3]       // Array LLUM, COND, PROD text per mostrar a pantalla
+  uint8_t text_2[3];      // Array LLUM, COND, PROD text per mostrar a pantalla
 } struct_message_to_slave;
 
 // Estrucrtura dades rebuda de slaves
@@ -290,8 +296,8 @@ typedef struct struct_bateria_info
 // Estructura dades per rebre clock
 // TODO
 
-struct_message incomingReadings;
-struct_message outgoingSetpoints;
+struct_message incomingReadings;  // Demo original per a eliminar ***********
+struct_message outgoingSetpoints; // Demo original per a eliminar ************
 struct_pairing pairingData;
 struct_message_from_slave fromSlave; // dades del master cap al tally
 struct_message_to_slave toSlave;     // dades del tally cap al master
@@ -401,23 +407,21 @@ void readDataToSend()
   outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
 }
 
-
-// AQUI CAL ARREGLAR MOLTES COSES
-void comunicar_slaves(TipusFuncio funcio_to_slave)
+void comunicar_slaves()
 {
   toSlave.msgType = TALLY;
-  toSlave.id = 0; // Servidor te el 0
-  toSlave.funcio = funcio_to_slave; // Aixo no esta gaire be
-  toSlave.led_roig = valor;
-  toSlave.led_verd = valor;
-  toSlave.color_tally = color;
-  toSlave.text_2 = text2;
-
+  for (int i = 0; i < 3; i++)
+  {
+    toSlave.led_roig[i] = led_roig[i]; // Li pasem array complert
+    toSlave.led_verd[i] = led_verd[i]; // Idem 3 valors LLUM, COND i PROD
+    toSlave.color_tally[i] = color_matrix[i];
+    toSlave.text_2[i] = display_text_2[i];
+  }
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
   if (result == ESP_OK)
   {
-    Serial.println("Sent polsadors with success");
+    Serial.println("Sent to slaves with success");
   }
   else
   {
@@ -605,7 +609,7 @@ void escriure_matrix(uint8_t color)
 
 void logica_polsadors_locals()
 {
-  if (!mode_configuracio && funcio_local == CONDUCTOR) // Si no estic en configuracio i SOC CONDUCTOR
+  if (!mode_configuracio && funcio_local_num == 1) // Si no estic en configuracio i SOC CONDUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
@@ -613,6 +617,8 @@ void logica_polsadors_locals()
       // El MUTE del micro CONDUCTOR es fa en rebre confirmació
       GPOB[1] = POLSADOR_LOCAL_ROIG[0]; // Si funcio=conductor enviem bit a gpo1 vermell
       GPOB[2] = POLSADOR_LOCAL_VERD[0]; // si funcio=conductor enviem bit a gpo2 verd
+      LOCAL_CHANGE = false;
+      escriure_GPO();
       if (POLSADOR_LOCAL_ROIG[0])
       {
         if (debug)
@@ -636,13 +642,15 @@ void logica_polsadors_locals()
     }
   }
 
-  if (!mode_configuracio && funcio_local == PRODUCTOR) // SOC PRODUCTOR
+  if (!mode_configuracio && funcio_local_num == 2) // SOC PRODUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
     {
       GPOB[3] = POLSADOR_LOCAL_ROIG[0]; // Si funcio=productor enviem el bit a gpo4 roig
       GPOB[4] = POLSADOR_LOCAL_VERD[0]; // Si funcio=productor enviem el bit a gpo5 verd
+      LOCAL_CHANGE = false;
+      escriure_GPO();
 
       if (POLSADOR_LOCAL_ROIG[0])
       {
@@ -678,27 +686,48 @@ void llegir_polsadors()
   POLSADOR_LOCAL_ROIG[1] = !digitalRead(POLSADOR_ROIG_PIN); // Els POLSADOR son PULLUP per tant els llegirem al revés
   POLSADOR_LOCAL_VERD[1] = !digitalRead(POLSADOR_VERD_PIN);
   // Detecció canvi de POLSADOR locals
-  if (POLSADOR_LOCAL_ROIG[0] != POLSADOR_LOCAL_ROIG[1])
+  if ((POLSADOR_LOCAL_ROIG[0] != POLSADOR_LOCAL_ROIG[1]) && (!debouncing_roig))
   {
-    /// HEM POLSAT EL POLSADOR ROIG
-    LOCAL_CHANGE = true;
-    POLSADOR_LOCAL_ROIG[0] = POLSADOR_LOCAL_ROIG[1];
-    if (debug)
+    /// HEM POLSAT EL POLSADOR ROIG PERO NO VALIDEM
+    last_time_roig = millis();
+    debouncing_roig = true;
+  }
+
+  if ((POLSADOR_LOCAL_ROIG[0] != POLSADOR_LOCAL_ROIG[1]) && (debouncing_roig))
+  {
+    if ((millis() - last_time_roig) > DEBOUNCE_DELAY)
     {
-      Serial.print("POLSADOR local ROIG: ");
-      Serial.println(POLSADOR_LOCAL_ROIG[0]);
+      // HA PASSAT EL TEMPS DE DEBOUNCING
+      LOCAL_CHANGE = true;
+      POLSADOR_LOCAL_ROIG[0] = POLSADOR_LOCAL_ROIG[1];
+      debouncing_roig = false;
+      if (debug)
+      {
+        Serial.print("POLSADOR local ROIG: ");
+        Serial.println(POLSADOR_LOCAL_ROIG[0]);
+      }
     }
   }
 
-  if (POLSADOR_LOCAL_VERD[0] != POLSADOR_LOCAL_VERD[1])
+  if ((POLSADOR_LOCAL_VERD[0] != POLSADOR_LOCAL_VERD[1]) && (!debouncing_verd))
   {
-    /// HEM POLSAT EL POLSADOR VERD
-    LOCAL_CHANGE = true;
-    POLSADOR_LOCAL_VERD[0] = POLSADOR_LOCAL_VERD[1];
-    if (debug)
+    /// HEM POLSAT EL POLSADOR VERD PERO NO VALIDEM
+    last_time_verd = millis();
+    debouncing_verd = true;
+  }
+  if ((POLSADOR_LOCAL_VERD[0] != POLSADOR_LOCAL_VERD[1]) && (debouncing_verd))
+  {
+
+    if ((millis() - last_time_verd) > DEBOUNCE_DELAY)
     {
-      Serial.print("POLSADOR local VERD: ");
-      Serial.println(POLSADOR_LOCAL_VERD[0]);
+      LOCAL_CHANGE = true;
+      POLSADOR_LOCAL_VERD[0] = POLSADOR_LOCAL_VERD[1];
+      debouncing_verd = false;
+      if (debug)
+      {
+        Serial.print("POLSADOR local VERD: ");
+        Serial.println(POLSADOR_LOCAL_VERD[0]);
+      }
     }
   }
 }
@@ -746,10 +775,10 @@ void logica_gpi()
         color_matrix[0] = 0;   // Negre (LLUM)
         color_matrix[1] = 0;   // Negre (CONDUCTOR)
         color_matrix[2] = 0;   // Negre (PRODUCTOR)
-        led_roig_conductor = false;
-        led_verd_conductor = false;
-        led_roig_productor = false;
-        led_verd_productor = false;
+        led_roig[1] = false;
+        led_verd[1] = false;
+        led_roig[2] = false;
+        led_verd[2] = false;
         if (debug)
         {
           Serial.println("Falla QL A + B + ON AIR + MIC ON");
@@ -776,10 +805,10 @@ void logica_gpi()
               color_matrix[0] = 1;   // Vermell (LLUM)
               color_matrix[1] = 1;   // Vermell (CONDUCTOR)
               color_matrix[2] = 1;   // Vermell (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC ON");
@@ -794,10 +823,10 @@ void logica_gpi()
               color_matrix[0] = 1;   // Vermell (LLUM)
               color_matrix[1] = 1;   // Vermell (CONDUCTOR)
               color_matrix[2] = 1;   // Blau (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = true;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = true;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC ON + ORDRES PROD 2 COND");
@@ -812,10 +841,10 @@ void logica_gpi()
               color_matrix[0] = 1;    // Vermell (LLUM)
               color_matrix[1] = 1;    // Vermell (CONDUCTOR)
               color_matrix[2] = 3;    // Cel (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = true;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = true;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC ON + ORDRES PROD 2 ESTU");
@@ -834,10 +863,10 @@ void logica_gpi()
               color_matrix[0] = 6;    // Taronja (LLUM)
               color_matrix[1] = 6;    // Taronja (CONDUCTOR)
               color_matrix[2] = 6;    // Taronja (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC OFF + NO ORDRES");
@@ -852,10 +881,10 @@ void logica_gpi()
               color_matrix[0] = 1;    // Vermell (LLUM)
               color_matrix[1] = 2;    // Blau (CONDUCTOR)
               color_matrix[2] = 1;    // Vermell (PRODUCTOR)
-              led_roig_conductor = true;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = true;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC OFF + ORDRES COND 2 PROD");
@@ -870,10 +899,10 @@ void logica_gpi()
               color_matrix[0] = 1;    // Vermell (LLUM)
               color_matrix[1] = 3;    // Cel (CONDUCTOR)
               color_matrix[2] = 1;    // Vermell (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = true;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = true;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
@@ -897,10 +926,10 @@ void logica_gpi()
               color_matrix[0] = 5;    // Groc (LLUM)
               color_matrix[1] = 5;    // Groc (CONDUCTOR)
               color_matrix[2] = 5;    // Groc (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC ON");
@@ -915,10 +944,10 @@ void logica_gpi()
               color_matrix[0] = 5;   // Groc (LLUM)
               color_matrix[1] = 5;   // Groc (CONDUCTOR)
               color_matrix[2] = 1;   // Blau (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = true;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = true;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC ON + ORDRES PROD 2 COND");
@@ -933,10 +962,10 @@ void logica_gpi()
               color_matrix[0] = 3;    // Groc (LLUM)
               color_matrix[1] = 3;    // Groc (CONDUCTOR)
               color_matrix[2] = 3;    // Cel (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = true;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = true;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC ON + ORDRES PROD 2 ESTU");
@@ -955,10 +984,10 @@ void logica_gpi()
               color_matrix[0] = 7;    // Blanc (LLUM)
               color_matrix[1] = 7;    // Blanc (CONDUCTOR)
               color_matrix[2] = 7;    // Blanc (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC OFF + NO ORDRES");
@@ -973,10 +1002,10 @@ void logica_gpi()
               color_matrix[0] = 7;    // Blanc (LLUM)
               color_matrix[1] = 2;    // Blau (CONDUCTOR)
               color_matrix[2] = 7;    // Blanc (PRODUCTOR)
-              led_roig_conductor = true;
-              led_verd_conductor = false;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = true;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES COND 2 PROD");
@@ -991,10 +1020,10 @@ void logica_gpi()
               color_matrix[0] = 7;    // Blanc (LLUM)
               color_matrix[1] = 3;    // Cel (CONDUCTOR)
               color_matrix[2] = 7;    // Blanc (PRODUCTOR)
-              led_roig_conductor = false;
-              led_verd_conductor = true;
-              led_roig_productor = false;
-              led_verd_productor = false;
+              led_roig[1] = false;
+              led_verd[1] = true;
+              led_roig[2] = false;
+              led_verd[2] = false;
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES COND 2 ESTU");
@@ -1020,10 +1049,10 @@ void logica_gpi()
         color_matrix[0] = 0;   // Negre (LLUM)
         color_matrix[1] = 0;   // Negre (CONDUCTOR)
         color_matrix[2] = 0;   // Negre (PRODUCTOR)
-        led_roig_conductor = false;
-        led_verd_conductor = false;
-        led_roig_productor = false;
-        led_verd_productor = false;
+        led_roig[1] = false;
+        led_verd[1] = false;
+        led_roig[2] = false;
+        led_verd[2] = false;
         if (debug)
         {
           Serial.println("Falla  A + B + ON AIR + MIC ON");
@@ -1046,10 +1075,10 @@ void logica_gpi()
             color_matrix[0] = 4;    // Verd (LLUM)
             color_matrix[1] = 4;    // Verd (CONDUCTOR)
             color_matrix[2] = 4;    // Verd (PRODUCTOR)
-            led_roig_conductor = false;
-            led_verd_conductor = false;
-            led_roig_productor = false;
-            led_verd_productor = false;
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = false;
+            led_verd[2] = false;
             if (debug)
             {
               Serial.println(" NO A + B + MIC ON");
@@ -1064,10 +1093,10 @@ void logica_gpi()
             color_matrix[0] = 4;   // Verd (LLUM)
             color_matrix[1] = 4;   // Verd (CONDUCTOR)
             color_matrix[2] = 2;   // Blau (PRODUCTOR)
-            led_roig_conductor = false;
-            led_verd_conductor = false;
-            led_roig_productor = true;
-            led_verd_productor = false;
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = true;
+            led_verd[2] = false;
             if (debug)
             {
               Serial.println(" NO A + B + MIC ON + ORDRES PROD 2 COND");
@@ -1082,10 +1111,10 @@ void logica_gpi()
             color_matrix[0] = 4;    // Verd (LLUM)
             color_matrix[1] = 4;    // Verd (CONDUCTOR)
             color_matrix[2] = 3;    // Cel (PRODUCTOR)
-            led_roig_conductor = false;
-            led_verd_conductor = false;
-            led_roig_productor = false;
-            led_verd_productor = true;
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = false;
+            led_verd[2] = true;
             if (debug)
             {
               Serial.println(" NO A + B + MIC ON + ORDRES PROD 2 ESTU");
@@ -1104,10 +1133,10 @@ void logica_gpi()
             color_matrix[0] = 6;    // Taronja (LLUM)
             color_matrix[1] = 6;    // Taronja (CONDUCTOR)
             color_matrix[2] = 6;    // Taronja (PRODUCTOR)
-            led_roig_conductor = false;
-            led_verd_conductor = false;
-            led_roig_productor = false;
-            led_verd_productor = false;
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = false;
+            led_verd[2] = false;
             if (debug)
             {
               Serial.println(" NO A + B  + MIC OFF + NO ORDRES");
@@ -1122,10 +1151,10 @@ void logica_gpi()
             color_matrix[0] = 4;    // Verd (LLUM)
             color_matrix[1] = 2;    // Blau (CONDUCTOR)
             color_matrix[2] = 4;    // Verd (PRODUCTOR)
-            led_roig_conductor = true;
-            led_verd_conductor = false;
-            led_roig_productor = false;
-            led_verd_productor = false;
+            led_roig[1] = true;
+            led_verd[1] = false;
+            led_roig[2] = false;
+            led_verd[2] = false;
             if (debug)
             {
               Serial.println(" NO A + B + MIC OFF + ORDRES COND 2 PROD");
@@ -1140,10 +1169,10 @@ void logica_gpi()
             color_matrix[0] = 4;    // Verd (LLUM)
             color_matrix[1] = 3;    // Cel (CONDUCTOR)
             color_matrix[2] = 4;    // Verd (PRODUCTOR)
-            led_roig_conductor = false;
-            led_verd_conductor = true;
-            led_roig_productor = false;
-            led_verd_productor = false;
+            led_roig[1] = false;
+            led_verd[1] = true;
+            led_roig[2] = false;
+            led_verd[2] = false;
             if (debug)
             {
               Serial.println(" NO A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
@@ -1164,10 +1193,10 @@ void logica_gpi()
         color_matrix[0] = 1;   // Vermell (LLUM)
         color_matrix[1] = 1;   // Vermell (CONDUCTOR)
         color_matrix[2] = 1;   // Vermell (PRODUCTOR)
-        led_roig_conductor = false;
-        led_verd_conductor = false;
-        led_roig_productor = false;
-        led_verd_productor = false;
+        led_roig[1] = false;
+        led_verd[1] = false;
+        led_roig[2] = false;
+        led_verd[2] = false;
         if (debug)
         {
           Serial.println(" A + NO B + ON AIR ");
@@ -1181,10 +1210,10 @@ void logica_gpi()
         color_matrix[0] = 7;    // Blanc (LLUM)
         color_matrix[1] = 7;    // Blanc (CONDUCTOR)
         color_matrix[2] = 7;    // Blanc (PRODUCTOR)
-        led_roig_conductor = false;
-        led_verd_conductor = false;
-        led_roig_productor = false;
-        led_verd_productor = false;
+        led_roig[1] = false;
+        led_verd[1] = false;
+        led_roig[2] = false;
+        led_verd[2] = false;
         if (debug)
         {
           Serial.println(" A + NO B + OFF AIR");
@@ -1200,16 +1229,18 @@ void logica_gpi()
       color_matrix[0] = 0;   // NEGRE (LLUM)
       color_matrix[1] = 0;   // NEGRE (CONDUCTOR)
       color_matrix[2] = 0;   // NEGRE (PRODUCTOR)
-      led_roig_conductor = false;
-      led_verd_conductor = false;
-      led_roig_productor = false;
-      led_verd_productor = false;
+      led_roig[1] = false;
+      led_verd[1] = false;
+      led_roig[2] = false;
+      led_verd[2] = false;
       if (debug)
       {
         Serial.println(" NO A + NO B ");
       }
     }
   }
+  GPIA_CHANGE = false;
+  GPIB_CHANGE = false;
 }
 
 void llegir_gpi()
@@ -1423,24 +1454,94 @@ void Menu_configuracio()
   // Veure com generem menu
   // local_text_1 = 4; //CONFIG
   // local_text_2 = 18; //MODE TALLY
-  escriure_display(4, 18, 0); // Dibuixem el mode config
-
-  // llegir polsadors
-  // si verd -> local_text_2 = 20 (conductor)
-  // Si vermell -> local_text_2 = 19 (productor)
-  // Cal veure com rotem?
-
-  // Dibuixem MENU A DISPLAY
-  // Llegim polsador verd = anterior Vermell = endavant
-  /*
-  Si opcio 1
-    funcio_local = LLUM;
-  Si opció 2
-    funcio_local = CONDUCTOR;
-  Si opcio 3
-    funcio_local = PRODUCTOR;
-  */
-  // Comunicar nova funció
+  int select[] = {18, 19, 20};
+  int sel = 0;
+  escriure_display_1(4);
+  post_mode_configuracio = false;
+  while (mode_configuracio)
+  {
+    escriure_display_2(select[sel]); // Dibuixem la opcio
+    /*
+    if (debug)
+    {
+      Serial.print("Sel: ");
+      Serial.println(sel);
+    }
+    */
+    LOCAL_CHANGE = false;
+    llegir_polsadors(); // Llegim els polsadors
+    if (LOCAL_CHANGE)
+    {
+      if (POLSADOR_LOCAL_ROIG[0] && !POLSADOR_LOCAL_VERD[0] && !post_mode_configuracio)
+      {
+        if (sel == 0)
+        {
+          sel = 2;
+        }
+        else
+        {
+          sel = (sel - 1);
+        }
+        if (debug)
+        {
+          Serial.print("Sel: ");
+          Serial.println(sel);
+        }
+      }
+      if (POLSADOR_LOCAL_VERD[0] && !POLSADOR_LOCAL_ROIG[0] && !post_mode_configuracio)
+      {
+        if (sel == 2)
+        {
+          sel = 0;
+        }
+        else
+        {
+          sel = (sel + 1);
+        }
+        if (debug)
+        {
+          Serial.print("Sel: ");
+          Serial.println(sel);
+        }
+      }
+      if (POLSADOR_LOCAL_VERD[0] && !POLSADOR_LOCAL_ROIG[0] && post_mode_configuracio)
+      {
+        post_mode_configuracio = false;
+      }
+      if (!POLSADOR_LOCAL_VERD[0] && POLSADOR_LOCAL_ROIG[0] && post_mode_configuracio)
+      {
+        post_mode_configuracio = false;
+      }
+      if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && !post_mode_configuracio) // Apretem dos botons per sortir config
+      {
+        temps_set_config_post = millis();
+        post_mode_configuracio = true;
+        if (debug)
+        {
+          Serial.println("ENTREM EN POST CONFIGURACIO MODE");
+        }
+      }
+    }
+    if (post_mode_configuracio && (millis() >= (temps_config + temps_set_config_post)))
+    {
+      LED_LOCAL_ROIG = false;
+      LED_LOCAL_VERD = false;
+      escriure_leds();
+      funcio_local_num = sel;
+      escriure_display_1(sel + 1); // Escribim la funció local
+      escriure_display_2(0);       // Borrem linea inferior
+      mode_configuracio = false;
+      if (debug)
+      {
+        Serial.println("SORTIM CONFIGURACIO MODE");
+        Serial.println("APAGUEM LEDS");
+        Serial.print("Sel: ");
+        Serial.println(sel);
+      }
+    }
+  }
+  LOCAL_CHANGE = false;
+  post_mode_configuracio = false;
 }
 
 void detectar_mode_configuracio()
@@ -1455,21 +1556,26 @@ void detectar_mode_configuracio()
       pre_mode_configuracio = true; // Situem el flag en pre-mode-confi
       if (debug)
       {
-        Serial.print("PRE CONFIGURACIO MODE");
+        Serial.println("PRE CONFIGURACIO MODE");
       }
     }
-
+    if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && (millis() >= (temps_config + temps_set_config)))
+    {
+      LED_LOCAL_ROIG = true;
+      LED_LOCAL_VERD = true;
+      escriure_leds();
+    }
     if ((!POLSADOR_LOCAL_ROIG[0] || !POLSADOR_LOCAL_VERD[0]) && pre_mode_configuracio)
     { // Si deixem de pulsar polsadors i estavem en pre_mode_de_configuracio
       if ((millis()) >= (temps_config + temps_set_config))
       {                                // Si ha pasat el temps d'activació
         mode_configuracio = true;      // Entrem en mode configuracio
         pre_mode_configuracio = false; // Sortim del mode preconfiguracio
+        LOCAL_CHANGE = false;
         if (debug)
         {
-          Serial.print("CONFIGURACIO MODE");
+          Serial.println("CONFIGURACIO MODE");
         }
-        // TODO: Cridar mode config
         Menu_configuracio();
       }
       else
@@ -1478,7 +1584,7 @@ void detectar_mode_configuracio()
         mode_configuracio = false;     // Cancelem la configuracio
         if (debug)
         {
-          Serial.print("CANCELEM CONFIGURACIO MODE");
+          Serial.println("CANCELEM CONFIGURACIO MODE");
         }
       }
     }
@@ -1583,6 +1689,10 @@ void setup()
     GPEXTA.pinMode(i, OUTPUT);
     GPEXTB.pinMode(i, OUTPUT);
   }
+  lcd.clear();
+  escriure_display_1(funcio_local_num + 1);
+  last_time_roig = millis(); // Debouncer polsador
+  last_time_verd = millis(); // Debouncer polsador
 }
 
 void loop()
@@ -1591,17 +1701,9 @@ void loop()
   if (LOCAL_CHANGE)
   {                               // Si hem apretat algun polsador
     detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
-    if (mode_configuracio)
-    {                      // Hem entrat en mode CONFIG
-      Menu_configuracio(); // Anem al menu config
-    }
-    else
-    {
-      logica_polsadors_locals(); // Apliquem la lógica polsadors locals
-      escriure_GPO();            // Escrivim els GPO (inclou logica GPO)
-    }
+    logica_polsadors_locals();    // Apliquem la lógica polsadors locals
   }
-  llegir_gpi(); // Llegim els gpi
+  // llegir_gpi(); // Llegim els gpi CAL TORNAR A ACTIVAR
   if (GPIA_CHANGE || GPIB_CHANGE)
   {
     logica_gpi();
