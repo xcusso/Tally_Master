@@ -546,11 +546,12 @@ void escriure_GPO()
 
   logica_GPO(); // Filtre per enviar només un GPO i fer logica Mute COND
 
+  
   for (uint8_t i = 8; i < 16; i++)
   {
     GPEXTA.digitalWrite(i, GPOA[i]);
     GPEXTB.digitalWrite(i, GPOB[i]);
-    if (debug)
+    /*if (debug)
     {
       Serial.print("GPOA PIN: ");
       Serial.print(i);
@@ -562,6 +563,7 @@ void escriure_GPO()
       Serial.print("Bit: ");
       Serial.println(GPOB[i]);
     }
+    */
   }
 }
 
@@ -1296,6 +1298,9 @@ void llegir_gpi()
       }
     }
   }
+  // PER PROVAR SENSE QL ni VIA CAL ELIMINAR ****************
+  GPIA[0][3] = true; //SIMULEM VIA
+  GPIB[0][5] = true; //SIMULEM QL
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -1703,7 +1708,7 @@ void loop()
     detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
     logica_polsadors_locals();    // Apliquem la lógica polsadors locals
   }
-  // llegir_gpi(); // Llegim els gpi CAL TORNAR A ACTIVAR
+  llegir_gpi(); // Llegim els gpi CAL TORNAR A ACTIVAR
   if (GPIA_CHANGE || GPIB_CHANGE)
   {
     logica_gpi();
