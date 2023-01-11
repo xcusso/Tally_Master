@@ -75,6 +75,7 @@ bool debug = true;
 #define LED_ROIG_PIN 17
 #define LED_VERD_PIN 18
 #define MATRIX_PIN 4
+// Definim temps per debouncer polsadors
 #define DEBOUNCE_DELAY 100 // Delay debouncer
 
 // Define Quantitat de leds
@@ -93,27 +94,6 @@ bool debug = true;
 // Definim un GPEXTA i un GPEXTB (cal canviar la direcció de del GPEXTB soldant A0 a VDD)
 PCF8575 GPEXTA(0x20);
 PCF8575 GPEXTB(0x21);
-
-/* AQUESTS PINS NO S'UTILITZEN
-
-// ******** EQUIP A
-// VIA
-// I Input O Output
-// Només son 4 i no hi ha tensió
-// TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
-// const uint8_t GPIA_PIN[4] = {2, 15, 19, 0}; // El bit 1 encen el led local del ESp32 - Atenció 0 Pullup!!!
-// const uint8_t GPOA_PIN[1] = {23};           // No tenim tants bits - Un sol bit de confirmacio
-// El bit de confirmació pot obrir canal de la taula
-
-// ******** EQUIP B
-// YAMAHA QL
-// I Input O Output
-// 5 Ins 5 Outs
-// TODO: FAREM SERVIR PLACA i2C PER AMPLIAR GPIO - CAL REDEFINIR
-// uint8_t const GPIB_PIN[6] = {39, 34, 35, 32, 33, 25};
-// uint8_t const GPOB_PIN[5] = {26, 27, 14, 12, 13};
-// uint8_t const GPOB_PIN[5] = {26, 27, 17, 16, 13}; // El 12 donava problemes al fer boot, el 14 treu PWM
-*/
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -169,7 +149,7 @@ bool LOCAL_CHANGE = false; // Per saber si alguna cosa local ha canviat
 
 unsigned long temps_set_config = 0;      // Temps que ha d'estar apretat per configuracio
 const unsigned long temps_config = 3000; // Temps per disparar opció config
-unsigned long temps_set_config_post = 0; // Temps per sortir config
+unsigned long temps_post_config = 0;     // Temps per sortir config
 bool pre_mode_configuracio = false;      // Inici mode configuració
 bool mode_configuracio = false;          // Mode configuració
 bool post_mode_configuracio = false;     // Final configuració
@@ -229,6 +209,7 @@ enum MessageType
 };
 MessageType messageType;
 
+/* Eliminar ?
 // Definim les funcions del Tally
 enum TipusFuncio
 {
@@ -237,6 +218,7 @@ enum TipusFuncio
   PRODUCTOR
 };
 TipusFuncio funcio_local = LLUM;
+*/
 
 int counter = 0;
 
@@ -546,7 +528,6 @@ void escriure_GPO()
 
   logica_GPO(); // Filtre per enviar només un GPO i fer logica Mute COND
 
-  
   for (uint8_t i = 8; i < 16; i++)
   {
     GPEXTA.digitalWrite(i, GPOA[i]);
@@ -1299,8 +1280,8 @@ void llegir_gpi()
     }
   }
   // PER PROVAR SENSE QL ni VIA CAL ELIMINAR ****************
-  GPIA[0][3] = true; //SIMULEM VIA
-  GPIB[0][5] = true; //SIMULEM QL
+  GPIA[0][3] = true; // SIMULEM VIA
+  GPIB[0][5] = true; // SIMULEM QL
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -1454,9 +1435,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 
 void Menu_configuracio()
 {
-  // Desenvolupar aqui el mode configuració
-  // TODO:  Seleccionar entre LLUM, CONDUCTOR i PRODUCTOR
-  // Veure com generem menu
   // local_text_1 = 4; //CONFIG
   // local_text_2 = 18; //MODE TALLY
   int select[] = {18, 19, 20};
@@ -1519,7 +1497,7 @@ void Menu_configuracio()
       }
       if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && !post_mode_configuracio) // Apretem dos botons per sortir config
       {
-        temps_set_config_post = millis();
+        temps_post_config = millis();
         post_mode_configuracio = true;
         if (debug)
         {
@@ -1527,7 +1505,7 @@ void Menu_configuracio()
         }
       }
     }
-    if (post_mode_configuracio && (millis() >= (temps_config + temps_set_config_post)))
+    if (post_mode_configuracio && (millis() >= (temps_config + temps_post_config)))
     {
       LED_LOCAL_ROIG = false;
       LED_LOCAL_VERD = false;
@@ -1694,21 +1672,26 @@ void setup()
     GPEXTA.pinMode(i, OUTPUT);
     GPEXTB.pinMode(i, OUTPUT);
   }
+  llum.clear();
   lcd.clear();
   escriure_display_1(funcio_local_num + 1);
   last_time_roig = millis(); // Debouncer polsador
   last_time_verd = millis(); // Debouncer polsador
+  LOCAL_CHANGE = false;
 }
 
 void loop()
 {
-  llegir_polsadors(); // Llegeix el valor dels polsadors
-  if (LOCAL_CHANGE)
-  {                               // Si hem apretat algun polsador
-    detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
-    logica_polsadors_locals();    // Apliquem la lógica polsadors locals
+  if (!mode_configuracio) // Si no estem en mode configuracio
+  {
+    llegir_polsadors(); // Llegeix el valor dels polsadors
+    if (LOCAL_CHANGE)
+    {                               // Si hem apretat algun polsador
+      detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
+      logica_polsadors_locals();    // Apliquem la lógica polsadors locals
+    }
   }
-  llegir_gpi(); // Llegim els gpi CAL TORNAR A ACTIVAR
+  llegir_gpi(); // Llegim els gpi
   if (GPIA_CHANGE || GPIB_CHANGE)
   {
     logica_gpi();
