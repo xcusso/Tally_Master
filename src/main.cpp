@@ -6,9 +6,7 @@
  */
 /*
 TODO
-
-ELIMINAR LES SIMULACIONS DE CONFIRMACIO DE QL!!!
-Linees: 497... i 526...
+Engegar leds botons quan rebem confirmacio QL
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
