@@ -37,7 +37,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h> //Control neopixels
-#include "PCF8575.h"           //Expansió I2C GPIO
+#include <Adafruit_PCF8575.h>       //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
 #define VERSIO "M1.1" // Versió del software
@@ -92,8 +92,8 @@ bool debug = true;
 // Referencia: https://www.prometec.net/mas-entradas-y-salidas-disponibles-esp32/
 // Treballarem amb dos moduls, d'aquesta manera gestionem 16+16 = 32 GPIO extres
 // Definim un GPEXTA i un GPEXTB (cal canviar la direcció de del GPEXTB soldant A0 a VDD)
-PCF8575 GPEXTA(0x20);
-PCF8575 GPEXTB(0x21);
+Adafruit_PCF8575 GPEXTA; //(0x20); // No modificat Adreça |0100|A0|A1|A2 0100000 7bit
+Adafruit_PCF8575 GPEXTB; //(0x22); // A1 a VDD
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -618,9 +618,9 @@ void logica_polsadors_locals()
       }
       //************* CAL ELIMINAR AIXO *********
       // Simulem GPO indicant GPI (simulem la QL)
-      GPIB[1][1] = GPOB[1];
-      GPIB[1][2] = GPOB[2];
-      GPIB_CHANGE = true;
+      //GPIB[1][1] = GPOB[1];
+      // GPIB[1][2] = GPOB[2];
+      // GPIB_CHANGE = true;
       //************* CAL ELIMINAR AIXO *********
     }
   }
@@ -656,9 +656,9 @@ void logica_polsadors_locals()
       }
       //************* CAL ELIMINAR AIXO *********
       // Simulem GPO indicant GPI (simulem la QL)
-      GPIB[1][3] = GPOB[3];
-      GPIB[1][4] = GPOB[4];
-      GPIB_CHANGE = true;
+      // GPIB[1][3] = GPOB[3];
+      // GPIB[1][4] = GPOB[4];
+      // GPIB_CHANGE = true;
       //************* CAL ELIMINAR AIXO *********
     }
   }
@@ -1229,37 +1229,38 @@ void logica_gpi()
 void llegir_gpi()
 {
   // PORT A
+  GPIA_CHANGE = false;
   for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
   {
-
     if (PORT_A == "VIA")
-    {
-      GPIA[1][i] = !GPEXTA.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
+    { 
+      GPIA[1][i] = GPEXTA.digitalRead(i);
       if (GPIA[0][i] != GPIA[1][i])
       {
         // GPI CANVIAT
         GPIA_CHANGE = true;
         GPIA[0][i] = GPIA[1][i];
+        
         if (debug)
         {
-          Serial.print("POLSADOR GPIA");
+          Serial.print("BIT GPIA ");
           Serial.print(i);
           Serial.print(": ");
           Serial.println(GPIA[0][i]);
         }
-      }
-      else
-      {
-        GPIA_CHANGE = false;
+        
       }
     }
   }
+  
   // PORT B
+  GPIB_CHANGE = false;
   for (uint8_t i = 0; i < 8; i++) // Llegim els 8 GPI del PORT A i B
   {
     if (PORT_B == "QL") // QL va amb PULLUP Logica inversa
     {
-      GPIB[1][i] = GPEXTB.digitalRead(i); // GPIX[1] => Actual  GPIX[0] => Anterior
+      // GPIX[1] => Actual  GPIX[0] => Anterior
+      GPIB[1][i] = GPEXTB.digitalRead(i);
       if (GPIB[0][i] != GPIB[1][i])
       {
         // GPI CANVIAT
@@ -1267,21 +1268,17 @@ void llegir_gpi()
         GPIB[0][i] = GPIB[1][i];
         if (debug)
         {
-          Serial.print("POLSADOR GPIB");
+          Serial.print("BIT GPIB ");
           Serial.print(i);
           Serial.print(": ");
           Serial.println(GPIB[0][i]);
         }
       }
-      else
-      {
-        GPIB_CHANGE = false;
-      }
     }
   }
   // PER PROVAR SENSE QL ni VIA CAL ELIMINAR ****************
-  GPIA[0][3] = true; // SIMULEM VIA
-  GPIB[0][5] = true; // SIMULEM QL
+  // GPIA[0][3] = true; // SIMULEM VIA
+  // GPIB[0][5] = true; // SIMULEM QL
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -1658,20 +1655,35 @@ void setup()
 
   // start server
   server.begin();
-  GPEXTA.begin(); // Arrenquem el modul extra de GPIO A
-  GPEXTB.begin(); // Arrenquem el modul extra de GPIO B
-
-  for (int i = 0; i < 8; i++) // Definim els 8 primers bits com INPUT PULLUP
+  if (!GPEXTA.begin(0x20, &Wire))
   {
-    GPEXTA.pinMode(i, INPUT_PULLUP);
-    GPEXTB.pinMode(i, INPUT_PULLUP);
+    Serial.println("Couldn't find PCF8575 A");
+    while (1)
+      ;
   }
-
-  for (int i = 8; i < 16; i++) // Definim els 8 ultims bits com OUTPUT
+  for (uint8_t p = 0; p < 8; p++)
   {
-    GPEXTA.pinMode(i, OUTPUT);
-    GPEXTB.pinMode(i, OUTPUT);
+    GPEXTA.pinMode(p, INPUT_PULLUP);
   }
+  for (uint8_t p = 8; p < 16; p++)
+  {
+    GPEXTA.pinMode(p, OUTPUT);
+  }
+  if (!GPEXTB.begin(0x22, &Wire))
+  {
+    Serial.println("Couldn't find PCF8575 B");
+    while (1)
+      ;
+  }
+  for (uint8_t p = 0; p < 8; p++)
+  {
+    GPEXTB.pinMode(p, INPUT_PULLUP);
+  }
+  for (uint8_t p = 8; p < 16; p++)
+  {
+    GPEXTA.pinMode(p, OUTPUT);
+  }
+  
   llum.clear();
   lcd.clear();
   escriure_display_1(funcio_local_num + 1);
