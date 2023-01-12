@@ -6,14 +6,12 @@
  */
 /*
 TODO
-Engegar leds botons quan rebem confirmacio QL
+Avisar quan es connecti i reconecti
+Gestio pagina web
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
-Fer menu selecció funció local
-Implentar Display
 Implentar hora
-Implentar mostrar texte
 Lectura valors reals bateria
 
 */
@@ -35,7 +33,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h> //Control neopixels
-#include <Adafruit_PCF8575.h>       //Expansió I2C GPIO
+#include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
 #define VERSIO "M1.1" // Versió del software
@@ -206,17 +204,6 @@ enum MessageType
   CLOCK
 };
 MessageType messageType;
-
-/* Eliminar ?
-// Definim les funcions del Tally
-enum TipusFuncio
-{
-  LLUM,
-  CONDUCTOR,
-  PRODUCTOR
-};
-TipusFuncio funcio_local = LLUM;
-*/
 
 int counter = 0;
 
@@ -652,18 +639,13 @@ void logica_polsadors_locals()
       {
         Serial.print("UN SOL POLSADOR PRODUCTOR");
       }
-      //************* CAL ELIMINAR AIXO *********
-      // Simulem GPO indicant GPI (simulem la QL)
-      // GPIB[1][3] = GPOB[3];
-      // GPIB[1][4] = GPOB[4];
-      // GPIB_CHANGE = true;
-      //************* CAL ELIMINAR AIXO *********
     }
   }
 }
 
 void llegir_polsadors()
-{
+{ 
+  LOCAL_CHANGE = false; // Definim que no hi ha canvis
   POLSADOR_LOCAL_ROIG[1] = !digitalRead(POLSADOR_ROIG_PIN); // Els POLSADOR son PULLUP per tant els llegirem al revés
   POLSADOR_LOCAL_VERD[1] = !digitalRead(POLSADOR_VERD_PIN);
   // Detecció canvi de POLSADOR locals
@@ -1274,9 +1256,6 @@ void llegir_gpi()
       }
     }
   }
-  // PER PROVAR SENSE QL ni VIA CAL ELIMINAR ****************
-  // GPIA[0][3] = true; // SIMULEM VIA
-  // GPIB[0][5] = true; // SIMULEM QL
 }
 
 // ---------------------------- esp_ now -------------------------
@@ -1432,21 +1411,13 @@ void Menu_configuracio()
 {
   // local_text_1 = 4; //CONFIG
   // local_text_2 = 18; //MODE TALLY
-  int select[] = {18, 19, 20};
+  int select[] = {18, 19, 20}; //Array amb les opcions de config
   int sel = 0;
   escriure_display_1(4);
   post_mode_configuracio = false;
   while (mode_configuracio)
   {
     escriure_display_2(select[sel]); // Dibuixem la opcio
-    /*
-    if (debug)
-    {
-      Serial.print("Sel: ");
-      Serial.println(sel);
-    }
-    */
-    LOCAL_CHANGE = false;
     llegir_polsadors(); // Llegim els polsadors
     if (LOCAL_CHANGE)
     {
@@ -1705,6 +1676,8 @@ void loop()
   if (GPIA_CHANGE || GPIB_CHANGE)
   {
     logica_gpi();
+    LED_LOCAL_ROIG = led_roig[funcio_local_num];
+    LED_LOCAL_VERD = led_verd[funcio_local_num];
     escriure_leds();
     // Preparar color local matrix
     escriure_matrix(color_matrix[funcio_local_num]);
