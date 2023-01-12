@@ -4,6 +4,7 @@
  Firmware per gestionar un sistema de Tally's inhalambrics.
 
  */
+
 /*
 TODO
 Avisar quan es connecti i reconecti
@@ -15,6 +16,7 @@ Implentar hora
 Lectura valors reals bateria
 
 */
+
 /*
   Basat en:
 
@@ -26,6 +28,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
   Based on JC Servaye example: https://github.com/Servayejc/esp_now_web_server/
 */
+
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
