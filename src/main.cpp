@@ -101,7 +101,7 @@ Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
                             {255, 0, 0},      // 1- ROIG
                             {0, 0, 255},      // 2- BLAU
-                            {0, 255, 255},    // 3- CEL
+                            {255, 0, 255},    // 3- MAGENTA
                             {0, 255, 0},      // 4- VERD
                             {255, 80, 0},    // 5- GROC
                             {255, 25, 0},    // 6- TARONJA
@@ -556,7 +556,6 @@ void escriure_display_clock(uint8_t temps_clock)
 // Posar llum a un color
 void escriure_matrix(uint8_t color)
 {
-  // GBR
   uint8_t R = COLOR[color][0];
   uint8_t G = COLOR[color][1];
   uint8_t B = COLOR[color][2];
@@ -579,6 +578,18 @@ void escriure_matrix(uint8_t color)
   }
 }
 
+void llum_rgb()
+{
+  llum.setPixelColor(0, llum.Color(0, 0, 255));
+  llum.setPixelColor(1, llum.Color(0, 255, 255));
+  llum.setPixelColor(2, llum.Color(0, 255, 0));
+  llum.setPixelColor(3, llum.Color(255, 80, 0));
+  llum.setPixelColor(4, llum.Color(255, 25, 0));
+  llum.setPixelColor(5, llum.Color(255, 0, 0));
+  llum.setPixelColor(6, llum.Color(255, 0, 255));
+  llum.setPixelColor(7, llum.Color(80, 80, 80));
+  llum.show();
+}
 void logica_polsadors_locals()
 {
   if (!mode_configuracio && funcio_local_num == 1) // Si no estic en configuracio i SOC CONDUCTOR
@@ -814,7 +825,7 @@ void logica_gpi()
               display_text_2[2] = 12; //"ORDRES A ESTUDI ", //12
               color_matrix[0] = 1;    // Vermell (LLUM)
               color_matrix[1] = 1;    // Vermell (CONDUCTOR)
-              color_matrix[2] = 3;    // Cel (PRODUCTOR)
+              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -852,9 +863,9 @@ void logica_gpi()
               display_text_2[0] = 8;  //"ORD COND A PROD ", //8
               display_text_2[1] = 10; //"ORD A PRODUCTOR ", //10
               display_text_2[2] = 9;  //"ORD DE CONDUCTOR", //9
-              color_matrix[0] = 1;    // Vermell (LLUM)
+              color_matrix[0] = 6;    // Taronja (LLUM)
               color_matrix[1] = 2;    // Blau (CONDUCTOR)
-              color_matrix[2] = 1;    // Vermell (PRODUCTOR)
+              color_matrix[2] = 6;    // Taronja (PRODUCTOR)
               led_roig[1] = true;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -870,9 +881,9 @@ void logica_gpi()
               display_text_2[0] = 13; //"ORD COND A ESTUD", //13
               display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
               display_text_2[2] = 4;  //"**** ON AIR ****", //4
-              color_matrix[0] = 1;    // Vermell (LLUM)
-              color_matrix[1] = 3;    // Cel (CONDUCTOR)
-              color_matrix[2] = 1;    // Vermell (PRODUCTOR)
+              color_matrix[0] = 6;    // Taronja (LLUM)
+              color_matrix[1] = 3;    // Magenta (CONDUCTOR)
+              color_matrix[2] = 6;    // Taronja (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = true;
               led_roig[2] = false;
@@ -880,6 +891,42 @@ void logica_gpi()
               if (debug)
               {
                 Serial.println(" A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A COND
+              display_text_2[0] = 8;  //"ORD PROD A COND ", //8
+              display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
+              display_text_2[2] = 9;  //"ORD A CONDUCTOR", //9
+              color_matrix[0] = 6;    // Taronja (LLUM)
+              color_matrix[1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[2] = 2;    // Blau (PRODUCTOR)
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = true;
+              led_verd[2] = false;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC OFF + ORDRES PROD 2 COND");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A ESTU
+              display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
+              display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
+              display_text_2[2] = 12;  //"ORDRES A ESTUDI", //12
+              color_matrix[0] = 6;    // Taronja (LLUM)
+              color_matrix[1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = true;
+              if (debug)
+              {
+                Serial.println(" A + B + ON AIR + MIC OFF + ORDRES PROD 2 ESTU");
               }
             }
           }
@@ -935,7 +982,7 @@ void logica_gpi()
               display_text_2[2] = 12; //"ORDRES A ESTUDI ", //12
               color_matrix[0] = 3;    // Groc (LLUM)
               color_matrix[1] = 3;    // Groc (CONDUCTOR)
-              color_matrix[2] = 3;    // Cel (PRODUCTOR)
+              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -992,7 +1039,7 @@ void logica_gpi()
               display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
               display_text_2[2] = 16; //"  MICRO TANCAT  "; //16
               color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 3;    // Cel (CONDUCTOR)
+              color_matrix[1] = 3;    // Magenta (CONDUCTOR)
               color_matrix[2] = 7;    // Blanc (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = true;
@@ -1084,7 +1131,7 @@ void logica_gpi()
             display_text_2[2] = 12; // "ORDRES A ESTUDI ", //12
             color_matrix[0] = 4;    // Verd (LLUM)
             color_matrix[1] = 4;    // Verd (CONDUCTOR)
-            color_matrix[2] = 3;    // Cel (PRODUCTOR)
+            color_matrix[2] = 3;    // Magenta (PRODUCTOR)
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1122,9 +1169,9 @@ void logica_gpi()
             display_text_2[0] = 8;  // "ORD COND A PROD ", //8
             display_text_2[1] = 10; //"ORD A PRODUCTOR ", //10
             display_text_2[2] = 9;  // "ORD DE CONDUCTOR", //9
-            color_matrix[0] = 4;    // Verd (LLUM)
+            color_matrix[0] = 6;    // Taronja (LLUM)
             color_matrix[1] = 2;    // Blau (CONDUCTOR)
-            color_matrix[2] = 4;    // Verd (PRODUCTOR)
+            color_matrix[2] = 6;    // Taronja (PRODUCTOR)
             led_roig[1] = true;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1139,10 +1186,10 @@ void logica_gpi()
             // Si tenim confirmació ordres COND A ESTU
             display_text_2[0] = 13; //"ORD COND A ESTUD", //13
             display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
-            display_text_2[2] = 17; //"* ON AIR LOCAL *", //17
-            color_matrix[0] = 4;    // Verd (LLUM)
-            color_matrix[1] = 3;    // Cel (CONDUCTOR)
-            color_matrix[2] = 4;    // Verd (PRODUCTOR)
+            display_text_2[2] = 14; //"TANCAT LOCALMENT", //14
+            color_matrix[0] = 6;    // Taronja (LLUM)
+            color_matrix[1] = 3;    // Magenta (CONDUCTOR)
+            color_matrix[2] = 6;    // Taronja (PRODUCTOR)
             led_roig[1] = false;
             led_verd[1] = true;
             led_roig[2] = false;
@@ -1150,6 +1197,42 @@ void logica_gpi()
             if (debug)
             {
               Serial.println(" NO A + B + ON AIR + MIC OFF + ORDRES COND 2 ESTU");
+            }
+          }
+          if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+          {
+            // Si tenim confirmació ordres PROD A COND
+            display_text_2[0] = 5;  // "ORD PROD A COND ", //5
+            display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
+            display_text_2[2] = 7;  // "ORD A CONDUCTOR", //7
+            color_matrix[0] = 6;    // Taronja (LLUM)
+            color_matrix[1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[2] = 2;    // Blau (PRODUCTOR)
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = true;
+            led_verd[2] = false;
+            if (debug)
+            {
+              Serial.println(" NO A + B + MIC OFF + ORDRES PROD 2 COND");
+            }
+          }
+          if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+          {
+            // Si tenim confirmació ordres PROD A ESTU
+            display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
+            display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
+            display_text_2[2] = 12; //"ORDRES A ESTUDI", //12
+            color_matrix[0] = 6;    // Taronja (LLUM)
+            color_matrix[1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+            led_roig[1] = false;
+            led_verd[1] = false;
+            led_roig[2] = false;
+            led_verd[2] = true;
+            if (debug)
+            {
+              Serial.println(" NO A + B + ON AIR + MIC OFF + ORDRES PROD 2 ESTU");
             }
           }
         }
@@ -1599,7 +1682,8 @@ void setup()
   lcd.print("Versio: ");
   lcd.setCursor(9, 1); // Caracter 9, segona linea
   lcd.print(VERSIO);
-
+  llum.clear();
+  llum_rgb();
   // Set the device as a Station and Soft Access Point simultaneously
   WiFi.mode(WIFI_AP_STA);
   // Set device as a Wi-Fi Station
