@@ -97,12 +97,12 @@ Adafruit_PCF8575 GPEXTB; //(0x22); // A1 a VDD
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
-// Definim els colors GRB
+// Definim els colors RGB
 const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
-                            {0, 255, 0},      // 1- ROIG
+                            {255, 0, 0},      // 1- ROIG
                             {0, 0, 255},      // 2- BLAU
                             {0, 255, 255},    // 3- CEL
-                            {255, 0, 0},      // 4- VERD
+                            {0, 255, 0},      // 4- VERD
                             {128, 255, 0},    // 5- GROC
                             {128, 128, 0},    // 6- TARONJA
                             {255, 255, 255}}; // 7- BLANC
@@ -557,12 +557,13 @@ void escriure_display_clock(uint8_t temps_clock)
 void escriure_matrix(uint8_t color)
 {
   // GBR
+  uint8_t R = COLOR[color][0];
   uint8_t G = COLOR[color][1];
   uint8_t B = COLOR[color][2];
-  uint8_t R = COLOR[color][0];
+  
   for (int i = 0; i < LED_COUNT; i++)
   {
-    llum.setPixelColor(i, llum.Color(G, B, R));
+    llum.setPixelColor(i, llum.Color(R, G, B));
   }
   llum.show();
   if (debug)
