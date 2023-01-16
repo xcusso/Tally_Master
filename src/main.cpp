@@ -796,7 +796,7 @@ void logica_gpi()
               display_text_2[2] = 7; //"ORD A CONDUCTOR ", //7
               color_matrix[0] = 1;   // Vermell (LLUM)
               color_matrix[1] = 1;   // Vermell (CONDUCTOR)
-              color_matrix[2] = 1;   // Blau (PRODUCTOR)
+              color_matrix[2] = 2;   // Blau (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -1519,12 +1519,7 @@ void detectar_mode_configuracio()
         Serial.println("PRE CONFIGURACIO MODE");
       }
     }
-    if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && (millis() >= (temps_config + temps_set_config)))
-    {
-      LED_LOCAL_ROIG = true;
-      LED_LOCAL_VERD = true;
-      escriure_leds();
-    }
+    
     if ((!POLSADOR_LOCAL_ROIG[0] || !POLSADOR_LOCAL_VERD[0]) && pre_mode_configuracio)
     { // Si deixem de pulsar polsadors i estavem en pre_mode_de_configuracio
       if ((millis()) >= (temps_config + temps_set_config))
@@ -1549,6 +1544,16 @@ void detectar_mode_configuracio()
       }
     }
   }
+  if (POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0] && pre_mode_configuracio && (millis() >= (temps_config + temps_set_config)))
+    {
+      LED_LOCAL_ROIG = true;
+      LED_LOCAL_VERD = true;
+      escriure_leds();
+      if (debug)
+        {
+          Serial.println("ENCENEM LEDS LOCALS");
+        }
+    }
 }
 
 void initESP_NOW()
@@ -1677,9 +1682,9 @@ void loop()
   if (!mode_configuracio) // Si no estem en mode configuracio
   {
     llegir_polsadors(); // Llegeix el valor dels polsadors
+    detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
     if (LOCAL_CHANGE)
     {                               // Si hem apretat algun polsador
-      detectar_mode_configuracio(); // Mirem si volem entrar en mode configuracio
       logica_polsadors_locals();    // Apliquem la lógica polsadors locals
     }
   }
