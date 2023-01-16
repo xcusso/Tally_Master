@@ -99,13 +99,13 @@ Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // Definim els colors RGB
 const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
-                            {255, 0, 0},      // 1- ROIG
+                            {0, 255, 0},      // 1- ROIG
                             {0, 0, 255},      // 2- BLAU
                             {0, 255, 255},    // 3- CEL
-                            {0, 255, 0},      // 4- VERD
-                            {255, 255, 0},    // 5- GROC
-                            {128, 128, 0},    // 6- TARONJA
-                            {255, 255, 255}}; // 7- BLANC
+                            {255, 0, 0},      // 4- VERD
+                            {80, 255, 0},    // 5- GROC
+                            {25, 255, 0},    // 6- TARONJA
+                            {200, 255, 125}}; // 7- BLANC
 
 uint8_t funcio_local_num = 0;       // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 uint8_t color_matrix[] = {0, 0, 0}; // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
