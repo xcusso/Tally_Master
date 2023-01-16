@@ -880,7 +880,7 @@ void logica_gpi()
               // Si tenim confirmació ordres COND A ESTU
               display_text_2[0] = 13; //"ORD COND A ESTUD", //13
               display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
-              display_text_2[2] = 4;  //"**** ON AIR ****", //4
+              display_text_2[2] = 14;  //"TANCAT LOCALMENT", //14
               color_matrix[0] = 6;    // Taronja (LLUM)
               color_matrix[1] = 3;    // Magenta (CONDUCTOR)
               color_matrix[2] = 6;    // Taronja (PRODUCTOR)
@@ -896,9 +896,9 @@ void logica_gpi()
             if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
             {
               // Si tenim confirmació ordres PROD A COND
-              display_text_2[0] = 8;  //"ORD PROD A COND ", //8
+              display_text_2[0] = 5;  //"ORD PROD A COND ", //5
               display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
-              display_text_2[2] = 9;  //"ORD A CONDUCTOR", //9
+              display_text_2[2] = 7;  //"ORD A CONDUCTOR", //7
               color_matrix[0] = 6;    // Taronja (LLUM)
               color_matrix[1] = 6;    // Taronja (CONDUCTOR)
               color_matrix[2] = 2;    // Blau (PRODUCTOR)
@@ -964,7 +964,7 @@ void logica_gpi()
               display_text_2[2] = 7; //"ORD A CONDUCTOR ", //7
               color_matrix[0] = 5;   // Groc (LLUM)
               color_matrix[1] = 5;   // Groc (CONDUCTOR)
-              color_matrix[2] = 1;   // Blau (PRODUCTOR)
+              color_matrix[2] = 2;   // Blau (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -980,8 +980,8 @@ void logica_gpi()
               display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
               display_text_2[1] = 4;  //"**** ON AIR ****", //4
               display_text_2[2] = 12; //"ORDRES A ESTUDI ", //12
-              color_matrix[0] = 3;    // Groc (LLUM)
-              color_matrix[1] = 3;    // Groc (CONDUCTOR)
+              color_matrix[0] = 5;    // Groc (LLUM)
+              color_matrix[1] = 5;    // Groc (CONDUCTOR)
               color_matrix[2] = 3;    // Magenta (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
@@ -1048,6 +1048,42 @@ void logica_gpi()
               if (debug)
               {
                 Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES COND 2 ESTU");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && GPIB[0][3] && !GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A COND
+              display_text_2[0] = 5;  //"ORD PROD A COND ", //5
+              display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
+              display_text_2[2] = 7;  //"ORD A CONDUCTOR", //7
+              color_matrix[0] = 7;    // Blanc (LLUM)
+              color_matrix[1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[2] = 2;    // Blau (PRODUCTOR)
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = true;
+              led_verd[2] = false;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES PROD 2 COND");
+              }
+            }
+            if (!GPIB[0][1] && !GPIB[0][2] && !GPIB[0][3] && GPIB[0][4])
+            {
+              // Si tenim confirmació ordres PROD A ESTU
+              display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
+              display_text_2[1] = 16; //" MICRO TANCAT ", //16
+              display_text_2[2] = 12; //"ORDRES A ESTUDI"; //12
+              color_matrix[0] = 7;    // Blanc (LLUM)
+              color_matrix[1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              led_roig[1] = false;
+              led_verd[1] = false;
+              led_roig[2] = false;
+              led_verd[2] = true;
+              if (debug)
+              {
+                Serial.println(" A + B + OFF AIR + MIC OFF + ORDRES PROD 2 ESTU");
               }
             }
           }
