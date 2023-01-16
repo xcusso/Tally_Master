@@ -78,7 +78,7 @@ bool debug = true;
 #define DEBOUNCE_DELAY 100 // Delay debouncer
 
 // Define Quantitat de leds
-#define LED_COUNT 72 // 8x8 + 8
+#define LED_COUNT 8 // 8x8 + 8
 
 // Define sensor battery
 #define BATTERY_PIN 36
@@ -703,6 +703,13 @@ void escriure_leds()
 {
   digitalWrite(LED_ROIG_PIN, LED_LOCAL_ROIG);
   digitalWrite(LED_VERD_PIN, LED_LOCAL_VERD);
+  if (debug)
+      {
+        Serial.print("POLSADOR local VERD: ");
+        Serial.println(LED_LOCAL_VERD);
+        Serial.print("POLSADOR local VERMELL: ");
+        Serial.println(LED_LOCAL_ROIG);
+      }
 }
 
 void logica_gpi()
