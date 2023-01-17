@@ -14,6 +14,7 @@ Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
 Implentar hora
 Lectura valors reals bateria
+Indicacions bicolors
 
 */
 
@@ -39,7 +40,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 
-#define VERSIO "M1.1" // Versió del software
+#define VERSIO "M1.2" // Versió del software
 
 // Bool per veure missatges de debug
 bool debug = true;
@@ -98,7 +99,7 @@ Adafruit_PCF8575 GPEXTB; //(0x22); // A1 a VDD
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // Definim els colors RGB
-const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
+const uint8_t COLOR[8][3] = {{0, 0, 0},        // 0- NEGRE
                             {255, 0, 0},      // 1- ROIG
                             {0, 0, 255},      // 2- BLAU
                             {255, 0, 255},    // 3- MAGENTA
@@ -107,8 +108,8 @@ const uint8_t COLOR[][6] = {{0, 0, 0},        // 0- NEGRE
                             {255, 25, 0},    // 6- TARONJA
                             {255, 200, 125}}; // 7- BLANC
 
-uint8_t funcio_local_num = 0;       // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
-uint8_t color_matrix[] = {0, 0, 0}; // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
+uint8_t funcio_local = 0;       // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
+uint8_t color_matrix[2][3] = {{ 0, 0, 0}, { 0, 0, 0}}; // Primera fila color principal Segona fila secundari Columnes: 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 
 // Declarem el display LCD
 LiquidCrystal_I2C lcd(0x27, 16, 2); // 0x27 adreça I2C 16 = Caracters 2= Linees
@@ -239,7 +240,8 @@ typedef struct struct_message_to_slave
   // Borrar - No cal funcio uint8_t funcio;      // Identificador de la funcio del tally
   bool led_roig[3];       // Array LLUM, COND, PROD llum confirmació cond polsador vermell
   bool led_verd[3];       // Array LLUM, COND, PROD llum confirmació cond polsador verd
-  uint8_t color_tally[3]; // Array LLUM, COND, PROD Color indexat del tally
+  uint8_t color_tally1[3]; // Color principal Array LLUM, COND, PROD Color indexat del tally
+  uint8_t color_tally2[3]; // Color secundari Array LLUM, COND, PROD Color indexat del tally
   uint8_t text_2[3];      // Array LLUM, COND, PROD text per mostrar a pantalla
 } struct_message_to_slave;
 
@@ -384,8 +386,8 @@ void comunicar_slaves()
   {
     toSlave.led_roig[i] = led_roig[i]; // Li pasem array complert
     toSlave.led_verd[i] = led_verd[i]; // Idem 3 valors LLUM, COND i PROD
-    toSlave.color_tally[i] = color_matrix[i];
-    toSlave.text_2[i] = display_text_2[i];
+    toSlave.color_tally1[i] = color_matrix[0][i]; //Versio Color principal
+    toSlave.color_tally2[i] = color_matrix[1][i]; //Versio Color secundari
   }
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
@@ -578,6 +580,48 @@ void escriure_matrix(uint8_t color)
   }
 }
 
+// Posar llum a un color
+void escriure_matrix_bicolor(uint8_t color1, uint8_t color2)
+{
+  uint8_t R1 = COLOR[color1][0];
+  uint8_t G1 = COLOR[color1][1];
+  uint8_t Blau1 = COLOR[color1][2];
+  
+  for (int i = 0; i < (LED_COUNT/2); i++)
+  {
+    llum.setPixelColor(i, llum.Color(R1, G1, Blau1));
+  }
+  uint8_t R2 = COLOR[color2][0];
+  uint8_t G2 = COLOR[color2][1];
+  uint8_t Blau2 = COLOR[color2][2];
+  
+    for (int i = (LED_COUNT/2); i < (LED_COUNT); i++)
+  {
+    llum.setPixelColor(i, llum.Color(R2, G2, Blau2));
+  }
+  llum.show();
+  if (debug)
+  {
+    Serial.print("Color1: ");
+    Serial.println(color1);
+    Serial.print("R: ");
+    Serial.println(R1);
+    Serial.print("G: ");
+    Serial.println(G1);
+    Serial.print("B: ");
+    Serial.println(Blau1);
+    Serial.print("Color1: ");
+    Serial.println(color1);
+    Serial.print("R: ");
+    Serial.println(R1);
+    Serial.print("G: ");
+    Serial.println(G1);
+    Serial.print("B: ");
+    Serial.println(Blau1);
+  }
+}
+
+
 void llum_rgb()
 {
   llum.setPixelColor(0, llum.Color(0, 0, 255));
@@ -592,7 +636,7 @@ void llum_rgb()
 }
 void logica_polsadors_locals()
 {
-  if (!mode_configuracio && funcio_local_num == 1) // Si no estic en configuracio i SOC CONDUCTOR
+  if (!mode_configuracio && funcio_local == 1) // Si no estic en configuracio i SOC CONDUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
@@ -625,7 +669,7 @@ void logica_polsadors_locals()
     }
   }
 
-  if (!mode_configuracio && funcio_local_num == 2) // SOC PRODUCTOR
+  if (!mode_configuracio && funcio_local == 2) // SOC PRODUCTOR
   {
     if (!(POLSADOR_LOCAL_ROIG[0] && POLSADOR_LOCAL_VERD[0]))
     // Si no apreto els dos polsadors simultaneament
@@ -757,9 +801,12 @@ void logica_gpi()
         display_text_2[0] = 3; //"  ERROR GPI QL  "
         display_text_2[1] = 3; //"  ERROR GPI QL  "
         display_text_2[2] = 3; //"  ERROR GPI QL  "
-        color_matrix[0] = 0;   // Negre (LLUM)
-        color_matrix[1] = 0;   // Negre (CONDUCTOR)
-        color_matrix[2] = 0;   // Negre (PRODUCTOR)
+        color_matrix[0][0] = 0;   // Negre (LLUM)
+        color_matrix[0][1] = 0;   // Negre (CONDUCTOR)
+        color_matrix[0][2] = 0;   // Negre (PRODUCTOR)
+        color_matrix[1][0] = 0;   // Negre (LLUM)
+        color_matrix[1][1] = 0;   // Negre (CONDUCTOR)
+        color_matrix[1][2] = 0;   // Negre (PRODUCTOR)
         led_roig[1] = false;
         led_verd[1] = false;
         led_roig[2] = false;
@@ -787,9 +834,12 @@ void logica_gpi()
               display_text_2[0] = 4; //"**** ON AIR ****"
               display_text_2[1] = 4; //"**** ON AIR ****"
               display_text_2[2] = 4; //"**** ON AIR ****"
-              color_matrix[0] = 1;   // Vermell (LLUM)
-              color_matrix[1] = 1;   // Vermell (CONDUCTOR)
-              color_matrix[2] = 1;   // Vermell (PRODUCTOR)
+              color_matrix[0][0] = 1;   // Vermell (LLUM)
+              color_matrix[0][1] = 1;   // Vermell (CONDUCTOR)
+              color_matrix[0][2] = 1;   // Vermell (PRODUCTOR)
+              color_matrix[1][0] = 1;   // Vermell (LLUM)
+              color_matrix[1][1] = 1;   // Vermell (CONDUCTOR)
+              color_matrix[1][2] = 1;   // Vermell (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -805,9 +855,12 @@ void logica_gpi()
               display_text_2[0] = 5; //"ORD PROD A COND ", //5
               display_text_2[1] = 6; //"ORD DE PRODUCTOR", //6
               display_text_2[2] = 7; //"ORD A CONDUCTOR ", //7
-              color_matrix[0] = 1;   // Vermell (LLUM)
-              color_matrix[1] = 1;   // Vermell (CONDUCTOR)
-              color_matrix[2] = 2;   // Blau (PRODUCTOR)
+              color_matrix[0][0] = 1;   // Vermell (LLUM)
+              color_matrix[0][1] = 1;   // Vermell (CONDUCTOR)
+              color_matrix[0][2] = 1;   // Vermell(PRODUCTOR)
+              color_matrix[1][0] = 1;   // Vermell (LLUM)
+              color_matrix[1][1] = 7;   // Blanc (CONDUCTOR)
+              color_matrix[1][2] = 2;   // Blau (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -823,9 +876,12 @@ void logica_gpi()
               display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
               display_text_2[1] = 4;  //"**** ON AIR ****", //4
               display_text_2[2] = 12; //"ORDRES A ESTUDI ", //12
-              color_matrix[0] = 1;    // Vermell (LLUM)
-              color_matrix[1] = 1;    // Vermell (CONDUCTOR)
-              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              color_matrix[0][0] = 1;    // Vermell (LLUM)
+              color_matrix[0][1] = 1;    // Vermell (CONDUCTOR)
+              color_matrix[0][2] = 1;    // Vermell (PRODUCTOR)
+              color_matrix[1][0] = 1;    // Vermell (LLUM)
+              color_matrix[1][1] = 1;    // Vermell (CONDUCTOR)
+              color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -845,9 +901,12 @@ void logica_gpi()
               display_text_2[0] = 14; //"TANCAT LOCALMENT", //14
               display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
               display_text_2[2] = 14; //"TANCAT LOCALMENT", //14
-              color_matrix[0] = 6;    // Taronja (LLUM)
-              color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-              color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[0][0] = 6;    // Taronja (LLUM)
+              color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[1][0] = 6;    // Taronja (LLUM)
+              color_matrix[1][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[1][2] = 6;    // Taronja (PRODUCTOR)              
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -863,9 +922,12 @@ void logica_gpi()
               display_text_2[0] = 8;  //"ORD COND A PROD ", //8
               display_text_2[1] = 10; //"ORD A PRODUCTOR ", //10
               display_text_2[2] = 9;  //"ORD DE CONDUCTOR", //9
-              color_matrix[0] = 6;    // Taronja (LLUM)
-              color_matrix[1] = 2;    // Blau (CONDUCTOR)
-              color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[0][0] = 6;    // Taronja (LLUM)
+              color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[1][0] = 6;    // Taronja (LLUM)
+              color_matrix[1][1] = 2;    // Blau (CONDUCTOR)
+              color_matrix[1][2] = 7;    // Blanc (PRODUCTOR)
               led_roig[1] = true;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -881,9 +943,12 @@ void logica_gpi()
               display_text_2[0] = 13; //"ORD COND A ESTUD", //13
               display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
               display_text_2[2] = 14;  //"TANCAT LOCALMENT", //14
-              color_matrix[0] = 6;    // Taronja (LLUM)
-              color_matrix[1] = 3;    // Magenta (CONDUCTOR)
-              color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[0][0] = 6;    // Taronja (LLUM)
+              color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[1][0] = 6;    // Taronja (LLUM)
+              color_matrix[1][1] = 3;    // Magenta (CONDUCTOR)
+              color_matrix[1][2] = 6;    // Taronja (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = true;
               led_roig[2] = false;
@@ -899,9 +964,12 @@ void logica_gpi()
               display_text_2[0] = 5;  //"ORD PROD A COND ", //5
               display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
               display_text_2[2] = 7;  //"ORD A CONDUCTOR", //7
-              color_matrix[0] = 6;    // Taronja (LLUM)
-              color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-              color_matrix[2] = 2;    // Blau (PRODUCTOR)
+              color_matrix[0][0] = 6;    // Taronja (LLUM)
+              color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[1][0] = 6;    // Taronja (LLUM)
+              color_matrix[1][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[1][2] = 2;    // Blau (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -917,9 +985,12 @@ void logica_gpi()
               display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
               display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
               display_text_2[2] = 12;  //"ORDRES A ESTUDI", //12
-              color_matrix[0] = 6;    // Taronja (LLUM)
-              color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              color_matrix[0][0] = 6;    // Taronja (LLUM)
+              color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+              color_matrix[1][0] = 6;    // Taronja (LLUM)
+              color_matrix[1][1] = 6;    // Taronja (CONDUCTOR)
+              color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)              
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -944,9 +1015,12 @@ void logica_gpi()
               display_text_2[0] = 15; //"TANCAT DE ESTUDI", //15
               display_text_2[1] = 15; //"TANCAT DE ESTUDI", //15
               display_text_2[2] = 15; //"TANCAT DE ESTUDI", //15
-              color_matrix[0] = 5;    // Groc (LLUM)
-              color_matrix[1] = 5;    // Groc (CONDUCTOR)
-              color_matrix[2] = 5;    // Groc (PRODUCTOR)
+              color_matrix[0][0] = 5;    // Groc (LLUM)
+              color_matrix[0][1] = 5;    // Groc (CONDUCTOR)
+              color_matrix[0][2] = 5;    // Groc (PRODUCTOR)
+              color_matrix[1][0] = 5;    // Groc (LLUM)
+              color_matrix[1][1] = 5;    // Groc (CONDUCTOR)
+              color_matrix[1][2] = 5;    // Groc (PRODUCTOR)              
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -962,9 +1036,12 @@ void logica_gpi()
               display_text_2[0] = 5; //"ORD PROD A COND ", //5
               display_text_2[1] = 6; //"ORD DE PRODUCTOR", //6
               display_text_2[2] = 7; //"ORD A CONDUCTOR ", //7
-              color_matrix[0] = 5;   // Groc (LLUM)
-              color_matrix[1] = 5;   // Groc (CONDUCTOR)
-              color_matrix[2] = 2;   // Blau (PRODUCTOR)
+              color_matrix[0][0] = 5;   // Groc (LLUM)
+              color_matrix[0][1] = 5;   // Groc (CONDUCTOR)
+              color_matrix[0][2] = 5;   // Groc (PRODUCTOR)
+              color_matrix[1][0] = 5;   // Groc (LLUM)
+              color_matrix[1][1] = 7;   // Blanc (CONDUCTOR)
+              color_matrix[1][2] = 2;   // Blau (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -980,9 +1057,12 @@ void logica_gpi()
               display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
               display_text_2[1] = 4;  //"**** ON AIR ****", //4
               display_text_2[2] = 12; //"ORDRES A ESTUDI ", //12
-              color_matrix[0] = 5;    // Groc (LLUM)
-              color_matrix[1] = 5;    // Groc (CONDUCTOR)
-              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              color_matrix[0][0] = 5;    // Groc (LLUM)
+              color_matrix[0][1] = 5;    // Groc (CONDUCTOR)
+              color_matrix[0][2] = 5;    // Groc (PRODUCTOR)
+              color_matrix[1][0] = 5;    // Groc (LLUM)
+              color_matrix[1][1] = 5;    // Groc (CONDUCTOR)
+              color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -1002,9 +1082,12 @@ void logica_gpi()
               display_text_2[0] = 16; //"  MICRO TANCAT  "; //16
               display_text_2[1] = 16; //"  MICRO TANCAT  "; //16
               display_text_2[2] = 16; //"  MICRO TANCAT  "; //16
-              color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 7;    // Blanc (CONDUCTOR)
-              color_matrix[2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[0][0] = 7;    // Blanc (LLUM)
+              color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[1][0] = 7;    // Blanc (LLUM)
+              color_matrix[1][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[1][2] = 7;    // Blanc (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -1020,9 +1103,12 @@ void logica_gpi()
               display_text_2[0] = 8;  //"ORD COND A PROD ", //8
               display_text_2[1] = 10; //"ORD A PRODUCTOR ", //10
               display_text_2[2] = 9;  //"ORD DE CONDUCTOR", //9
-              color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 2;    // Blau (CONDUCTOR)
-              color_matrix[2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[0][0] = 7;    // Blanc (LLUM)
+              color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[1][0] = 7;    // Blanc (LLUM)
+              color_matrix[1][1] = 2;    // Blau (CONDUCTOR)
+              color_matrix[1][2] = 0;    // Negre (PRODUCTOR)              
               led_roig[1] = true;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -1038,9 +1124,12 @@ void logica_gpi()
               display_text_2[0] = 13; //"ORD COND A ESTUD", //13
               display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
               display_text_2[2] = 16; //"  MICRO TANCAT  "; //16
-              color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 3;    // Magenta (CONDUCTOR)
-              color_matrix[2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[0][0] = 7;    // Blanc (LLUM)
+              color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[1][0] = 7;    // Blanc (LLUM)
+              color_matrix[1][1] = 3;    // Magenta (CONDUCTOR)
+              color_matrix[1][2] = 7;    // Blanc (PRODUCTOR)
               led_roig[1] = false;
               led_verd[1] = true;
               led_roig[2] = false;
@@ -1056,9 +1145,12 @@ void logica_gpi()
               display_text_2[0] = 5;  //"ORD PROD A COND ", //5
               display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
               display_text_2[2] = 7;  //"ORD A CONDUCTOR", //7
-              color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 7;    // Blanc (CONDUCTOR)
-              color_matrix[2] = 2;    // Blau (PRODUCTOR)
+              color_matrix[0][0] = 7;    // Blanc (LLUM)
+              color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[1][0] = 7;    // Blanc (LLUM)
+              color_matrix[1][1] = 0;    // Negre (CONDUCTOR)
+              color_matrix[1][2] = 2;    // Blau (PRODUCTOR)              
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = true;
@@ -1074,9 +1166,12 @@ void logica_gpi()
               display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
               display_text_2[1] = 16; //" MICRO TANCAT ", //16
               display_text_2[2] = 12; //"ORDRES A ESTUDI"; //12
-              color_matrix[0] = 7;    // Blanc (LLUM)
-              color_matrix[1] = 7;    // Blanc (CONDUCTOR)
-              color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+              color_matrix[0][0] = 7;    // Blanc (LLUM)
+              color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+              color_matrix[1][0] = 7;    // Blanc (LLUM)
+              color_matrix[1][1] = 7;    // Blanc (CONDUCTOR)
+              color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)              
               led_roig[1] = false;
               led_verd[1] = false;
               led_roig[2] = false;
@@ -1103,9 +1198,12 @@ void logica_gpi()
         display_text_2[0] = 3; //"  ERROR GPI QL  ", //3
         display_text_2[1] = 3; //"  ERROR GPI QL  ", //3
         display_text_2[2] = 3; //"  ERROR GPI QL  ", //3
-        color_matrix[0] = 0;   // Negre (LLUM)
-        color_matrix[1] = 0;   // Negre (CONDUCTOR)
-        color_matrix[2] = 0;   // Negre (PRODUCTOR)
+        color_matrix[0][0] = 0;   // Negre (LLUM)
+        color_matrix[0][1] = 0;   // Negre (CONDUCTOR)
+        color_matrix[0][2] = 0;   // Negre (PRODUCTOR)
+        color_matrix[1][0] = 0;   // Negre (LLUM)
+        color_matrix[1][1] = 0;   // Negre (CONDUCTOR)
+        color_matrix[1][2] = 0;   // Negre (PRODUCTOR)
         led_roig[1] = false;
         led_verd[1] = false;
         led_roig[2] = false;
@@ -1129,9 +1227,12 @@ void logica_gpi()
             display_text_2[0] = 17; // "* ON AIR LOCAL *", //17
             display_text_2[1] = 17; // "* ON AIR LOCAL *", //17
             display_text_2[2] = 17; // "* ON AIR LOCAL *", //17
-            color_matrix[0] = 4;    // Verd (LLUM)
-            color_matrix[1] = 4;    // Verd (CONDUCTOR)
-            color_matrix[2] = 4;    // Verd (PRODUCTOR)
+            color_matrix[0][0] = 4;    // Verd (LLUM)
+            color_matrix[0][1] = 4;    // Verd (CONDUCTOR)
+            color_matrix[0][2] = 4;    // Verd (PRODUCTOR)
+            color_matrix[1][0] = 4;    // Verd (LLUM)
+            color_matrix[1][1] = 4;    // Verd (CONDUCTOR)
+            color_matrix[1][2] = 4;    // Verd (PRODUCTOR)
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1147,9 +1248,12 @@ void logica_gpi()
             display_text_2[0] = 5; //"ORD PROD A COND ", //5
             display_text_2[1] = 6; //"ORD DE PRODUCTOR", //6
             display_text_2[2] = 7; //"ORD A CONDUCTOR ", //7
-            color_matrix[0] = 4;   // Verd (LLUM)
-            color_matrix[1] = 4;   // Verd (CONDUCTOR)
-            color_matrix[2] = 2;   // Blau (PRODUCTOR)
+            color_matrix[0][0] = 4;   // Verd (LLUM)
+            color_matrix[0][1] = 4;   // Verd (CONDUCTOR)
+            color_matrix[0][2] = 4;   // Verd (PRODUCTOR)
+            color_matrix[1][0] = 4;   // Verd (LLUM)
+            color_matrix[1][1] = 7;   // Blanc (CONDUCTOR)
+            color_matrix[1][2] = 2;   // Blau (PRODUCTOR)            
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = true;
@@ -1165,9 +1269,12 @@ void logica_gpi()
             display_text_2[0] = 11; // "ORD PROD A ESTUD", //11
             display_text_2[1] = 17; // "* ON AIR LOCAL *", //17
             display_text_2[2] = 12; // "ORDRES A ESTUDI ", //12
-            color_matrix[0] = 4;    // Verd (LLUM)
-            color_matrix[1] = 4;    // Verd (CONDUCTOR)
-            color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+            color_matrix[0][0] = 4;    // Verd (LLUM)
+            color_matrix[0][1] = 4;    // Verd (CONDUCTOR)
+            color_matrix[0][2] = 4;    // Verd (PRODUCTOR)
+            color_matrix[1][0] = 4;    // Verd (LLUM)
+            color_matrix[1][1] = 4;    // Verd (CONDUCTOR)
+            color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1187,9 +1294,12 @@ void logica_gpi()
             display_text_2[0] = 14; //"TANCAT LOCALMENT", //14
             display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
             display_text_2[2] = 14; //"TANCAT LOCALMENT", //14
-            color_matrix[0] = 6;    // Taronja (LLUM)
-            color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-            color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[0][0] = 6;    // Taronja (LLUM)
+            color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[1][0] = 6;    // Taronja (LLUM)
+            color_matrix[1][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[1][2] = 6;    // Taronja (PRODUCTOR)            
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1205,9 +1315,12 @@ void logica_gpi()
             display_text_2[0] = 8;  // "ORD COND A PROD ", //8
             display_text_2[1] = 10; //"ORD A PRODUCTOR ", //10
             display_text_2[2] = 9;  // "ORD DE CONDUCTOR", //9
-            color_matrix[0] = 6;    // Taronja (LLUM)
-            color_matrix[1] = 2;    // Blau (CONDUCTOR)
-            color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[0][0] = 6;    // Taronja (LLUM)
+            color_matrix[0][1] = 6;    // Taronja(CONDUCTOR)
+            color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[1][0] = 6;    // Taronja (LLUM)
+            color_matrix[1][1] = 2;    // Blau (CONDUCTOR)
+            color_matrix[1][2] = 7;    // Blanc (PRODUCTOR)
             led_roig[1] = true;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1223,9 +1336,12 @@ void logica_gpi()
             display_text_2[0] = 13; //"ORD COND A ESTUD", //13
             display_text_2[1] = 12; //"ORDRES A ESTUDI ", //12
             display_text_2[2] = 14; //"TANCAT LOCALMENT", //14
-            color_matrix[0] = 6;    // Taronja (LLUM)
-            color_matrix[1] = 3;    // Magenta (CONDUCTOR)
-            color_matrix[2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[0][0] = 6;    // Taronja (LLUM)
+            color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[1][0] = 6;    // Taronja (LLUM)
+            color_matrix[1][1] = 3;    // Magenta (CONDUCTOR)
+            color_matrix[1][2] = 6;    // Taronja (PRODUCTOR)            
             led_roig[1] = false;
             led_verd[1] = true;
             led_roig[2] = false;
@@ -1241,9 +1357,12 @@ void logica_gpi()
             display_text_2[0] = 5;  // "ORD PROD A COND ", //5
             display_text_2[1] = 6; //"ORD DE PRODUCTOR ", //6
             display_text_2[2] = 7;  // "ORD A CONDUCTOR", //7
-            color_matrix[0] = 6;    // Taronja (LLUM)
-            color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-            color_matrix[2] = 2;    // Blau (PRODUCTOR)
+            color_matrix[0][0] = 6;    // Taronja (LLUM)
+            color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[0][2] = 6;    // Taronja(PRODUCTOR)
+            color_matrix[1][0] = 6;    // Taronja (LLUM)
+            color_matrix[1][1] = 7;    // Blanc (CONDUCTOR)
+            color_matrix[1][2] = 2;    // Blau (PRODUCTOR)
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = true;
@@ -1259,9 +1378,12 @@ void logica_gpi()
             display_text_2[0] = 11; //"ORD PROD A ESTUD", //11
             display_text_2[1] = 14; //"TANCAT LOCALMENT", //14
             display_text_2[2] = 12; //"ORDRES A ESTUDI", //12
-            color_matrix[0] = 6;    // Taronja (LLUM)
-            color_matrix[1] = 6;    // Taronja (CONDUCTOR)
-            color_matrix[2] = 3;    // Magenta (PRODUCTOR)
+            color_matrix[0][0] = 6;    // Taronja (LLUM)
+            color_matrix[0][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[0][2] = 6;    // Taronja (PRODUCTOR)
+            color_matrix[1][0] = 6;    // Taronja (LLUM)
+            color_matrix[1][1] = 6;    // Taronja (CONDUCTOR)
+            color_matrix[1][2] = 3;    // Magenta (PRODUCTOR)            
             led_roig[1] = false;
             led_verd[1] = false;
             led_roig[2] = false;
@@ -1283,9 +1405,12 @@ void logica_gpi()
         display_text_2[0] = 4; // "**** ON AIR ****", //4
         display_text_2[1] = 4; // "**** ON AIR ****", //4
         display_text_2[2] = 4; // "**** ON AIR ****", //4
-        color_matrix[0] = 1;   // Vermell (LLUM)
-        color_matrix[1] = 1;   // Vermell (CONDUCTOR)
-        color_matrix[2] = 1;   // Vermell (PRODUCTOR)
+        color_matrix[0][0] = 1;   // Vermell (LLUM)
+        color_matrix[0][1] = 1;   // Vermell (CONDUCTOR)
+        color_matrix[0][2] = 1;   // Vermell (PRODUCTOR)
+        color_matrix[1][0] = 1;   // Vermell (LLUM)
+        color_matrix[1][1] = 1;   // Vermell (CONDUCTOR)
+        color_matrix[1][2] = 1;   // Vermell (PRODUCTOR)        
         led_roig[1] = false;
         led_verd[1] = false;
         led_roig[2] = false;
@@ -1300,9 +1425,12 @@ void logica_gpi()
         display_text_2[0] = 15; // "TANCAT DE ESTUDI", //15
         display_text_2[1] = 15; // "TANCAT DE ESTUDI", //15
         display_text_2[2] = 15; // "TANCAT DE ESTUDI", //15
-        color_matrix[0] = 7;    // Blanc (LLUM)
-        color_matrix[1] = 7;    // Blanc (CONDUCTOR)
-        color_matrix[2] = 7;    // Blanc (PRODUCTOR)
+        color_matrix[0][0] = 7;    // Blanc (LLUM)
+        color_matrix[0][1] = 7;    // Blanc (CONDUCTOR)
+        color_matrix[0][2] = 7;    // Blanc (PRODUCTOR)
+        color_matrix[1][0] = 7;    // Blanc (LLUM)
+        color_matrix[1][1] = 7;    // Blanc (CONDUCTOR)
+        color_matrix[1][2] = 7;    // Blanc (PRODUCTOR)
         led_roig[1] = false;
         led_verd[1] = false;
         led_roig[2] = false;
@@ -1319,9 +1447,12 @@ void logica_gpi()
       display_text_2[0] = 1; // " FORA DE SERVEI ", //1
       display_text_2[1] = 1; // " FORA DE SERVEI ", //1
       display_text_2[2] = 1; // " FORA DE SERVEI ", //1
-      color_matrix[0] = 0;   // NEGRE (LLUM)
-      color_matrix[1] = 0;   // NEGRE (CONDUCTOR)
-      color_matrix[2] = 0;   // NEGRE (PRODUCTOR)
+      color_matrix[0][0] = 0;   // NEGRE (LLUM)
+      color_matrix[0][1] = 0;   // NEGRE (CONDUCTOR)
+      color_matrix[0][2] = 0;   // NEGRE (PRODUCTOR)
+      color_matrix[1][0] = 0;   // NEGRE (LLUM)
+      color_matrix[1][1] = 0;   // NEGRE (CONDUCTOR)
+      color_matrix[1][2] = 0;   // NEGRE (PRODUCTOR)
       led_roig[1] = false;
       led_verd[1] = false;
       led_roig[2] = false;
@@ -1606,7 +1737,7 @@ void Menu_configuracio()
       LED_LOCAL_ROIG = false;
       LED_LOCAL_VERD = false;
       escriure_leds();
-      funcio_local_num = sel;
+      funcio_local = sel;
       escriure_display_1(sel + 1); // Escribim la funció local
       escriure_display_2(0);       // Borrem linea inferior
       mode_configuracio = false;
@@ -1719,7 +1850,7 @@ void setup()
   lcd.setCursor(9, 1); // Caracter 9, segona linea
   lcd.print(VERSIO);
   llum.clear();
-  llum_rgb();
+  llum_rgb(); // Encenem la llum inicial
   // Set the device as a Station and Soft Access Point simultaneously
   WiFi.mode(WIFI_AP_STA);
   // Set device as a Wi-Fi Station
@@ -1791,7 +1922,7 @@ void setup()
   
   llum.clear();
   lcd.clear();
-  escriure_display_1(funcio_local_num + 1);
+  escriure_display_1(funcio_local + 1);
   last_time_roig = millis(); // Debouncer polsador
   last_time_verd = millis(); // Debouncer polsador
   LOCAL_CHANGE = false;
@@ -1812,13 +1943,15 @@ void loop()
   if (GPIA_CHANGE || GPIB_CHANGE)
   {
     logica_gpi();
-    LED_LOCAL_ROIG = led_roig[funcio_local_num];
-    LED_LOCAL_VERD = led_verd[funcio_local_num];
+    LED_LOCAL_ROIG = led_roig[funcio_local];
+    LED_LOCAL_VERD = led_verd[funcio_local];
     escriure_leds();
     // Preparar color local matrix
-    escriure_matrix(color_matrix[funcio_local_num]);
+    // escriure_matrix(color_matrix[0][funcio_local]);
+    // Preparar color bicolor
+    escriure_matrix_bicolor(color_matrix[0][funcio_local], color_matrix[1][funcio_local]);
     // Preparar variables display
-    escriure_display_2(display_text_2[funcio_local_num]); // TODO Passar la hora
+    escriure_display_2(display_text_2[funcio_local]); // TODO Passar la hora
     // data TALLY SEND
     comunicar_slaves(); // Enviem les dades rebudes als slaves
   }
