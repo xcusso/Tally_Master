@@ -12,9 +12,10 @@ Gestio pagina web
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
-Implentar hora
 Lectura valors reals bateria
-Indicacions bicolors
+Indicacions bicolors: No es veuen be. Cal provar amb un altre sistema.
+
+Hauria de poder funcionar sense WIFI. Ara es queda esperant WIFI.
 
 */
 
