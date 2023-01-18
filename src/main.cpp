@@ -377,15 +377,6 @@ obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius ar
 Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
 */
 
-void readDataToSend()
-{
-  outgoingSetpoints.msgType = DATA;
-  outgoingSetpoints.id = 0; // Servidor te la id 0, els esclaus la 1,2,3..
-  outgoingSetpoints.temp = random(0, 40);
-  outgoingSetpoints.hum = random(0, 100);
-  outgoingSetpoints.readingId = counter++; // Cada vegada que enviem dades incrementem el contador
-}
-
 void comunicar_slaves()
 {
   toSlave.msgType = TALLY;
@@ -410,6 +401,8 @@ void comunicar_slaves()
 
 // Simulem lectura de bateria
 // TODO Unificar lectura volts i convertir a nivells
+// BAteria 4,2V - 3,2V si posem dos diodes en serie
+
 float readBateriaVolts()
 {
   float volt = random(0, 40); // = analogRead(BATTERY_PIN)
@@ -1993,13 +1986,12 @@ void loop()
   llegir_hora();
   escriure_display_clock();
   static unsigned long lastEventTime = millis();
-  static const unsigned long EVENT_INTERVAL_MS = 5000; // Envia cada 5 segons informació
+  static const unsigned long EVENT_INTERVAL_MS = 5000; // canviar a 20000 x Enviar cada 20 segons informació
   // Cal canviar el loop per fer-lo quan es rebi un GPIO
   if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
   {
     events.send("ping", NULL, millis()); // Actualitza la web
     lastEventTime = millis();
-    readDataToSend();
     esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
   }
 }
