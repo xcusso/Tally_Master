@@ -249,8 +249,7 @@ typedef struct struct_message_to_slave
   // Borrar - No cal funcio uint8_t funcio;      // Identificador de la funcio del tally
   bool led_roig[3];        // Array LLUM, COND, PROD llum confirmació cond polsador vermell
   bool led_verd[3];        // Array LLUM, COND, PROD llum confirmació cond polsador verd
-  uint8_t color_tally1[3]; // Color principal Array LLUM, COND, PROD Color indexat del tally
-  uint8_t color_tally2[3]; // Color secundari Array LLUM, COND, PROD Color indexat del tally
+  uint8_t color_tally[3]; // Color principal Array LLUM, COND, PROD Color indexat del tally
   uint8_t text_2[3];       // Array LLUM, COND, PROD text per mostrar a pantalla
 } struct_message_to_slave;
 
@@ -385,10 +384,17 @@ void comunicar_slaves()
   toSlave.msgType = TALLY;
   for (int i = 0; i < 3; i++)
   {
-    toSlave.led_roig[i] = led_roig[i];            // Li pasem array complert
-    toSlave.led_verd[i] = led_verd[i];            // Idem 3 valors LLUM, COND i PROD
-    toSlave.color_tally1[i] = color_matrix[0][i]; // Versio Color principal
-    toSlave.color_tally2[i] = color_matrix[1][i]; // Versio Color secundari
+    toSlave.led_roig[i] = led_roig[i]; // Li pasem array complert
+    toSlave.led_verd[i] = led_verd[i]; // Idem 3 valors LLUM, COND i PROD
+    switch (ModeColor)
+    {
+    case 1:                                        // Mode 1 Normal
+      toSlave.color_tally[i] = color_matrix[0][i]; // Versio Color principal
+      break;
+    case 2:                                        // Mode 2 canvi color TX
+      toSlave.color_tally[i] = color_matrix[1][i]; // Versio Color secundari
+      break;
+    }
   }
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
@@ -418,7 +424,7 @@ float readBateriaPercent()
   uint8_t percent = random(0, 100);
   return percent;
 }
-
+// Logica dels GPO
 void logica_GPO()
 {
   // Aquesta funció s'encarrega de vigilar que no s'enviin combinacions de GPO
@@ -512,6 +518,7 @@ void logica_GPO()
   }
 }
 
+// Escrivim sortides GPO
 void escriure_GPO()
 {
   // Que passa si apretem tots els polsadors alhora. La QL intententara carregar 4
@@ -525,22 +532,8 @@ void escriure_GPO()
   {
     GPEXTA.digitalWrite(i, GPOA[i]);
     GPEXTB.digitalWrite(i, GPOB[i]);
-    /*if (debug)
-    {
-      Serial.print("GPOA PIN: ");
-      Serial.print(i);
-      Serial.print("Bit: ");
-      Serial.println(GPOA[i]);
-
-      Serial.print("GPOB PIN: ");
-      Serial.print(i);
-      Serial.print("Bit: ");
-      Serial.println(GPOB[i]);
-    }
-    */
   }
 }
-
 // Dibuixem el primer fragment Display (Funcio actual)
 void escriure_display_1(uint8_t txt1)
 {
@@ -616,6 +609,7 @@ void escriure_matrix(uint8_t color)
   }
 }
 
+// Llum arrencada
 void llum_rgb()
 {
   llum.setPixelColor(0, llum.Color(0, 0, 10));
@@ -628,6 +622,7 @@ void llum_rgb()
   llum.setPixelColor(7, llum.Color(0, 0, 10));
   llum.show();
 }
+// Gestió logica polsadors locals
 void logica_polsadors_locals()
 {
   if (!mode_configuracio && funcio_local == 1) // Si no estic en configuracio i SOC CONDUCTOR
@@ -689,7 +684,7 @@ void logica_polsadors_locals()
     }
   }
 }
-
+// Lectura polsadors locals
 void llegir_polsadors()
 {
   LOCAL_CHANGE = false;                                     // Definim que no hi ha canvis
@@ -741,7 +736,7 @@ void llegir_polsadors()
     }
   }
 }
-
+// Dibuixem leds polsadors
 void escriure_leds()
 {
   digitalWrite(LED_ROIG_PIN, LED_LOCAL_ROIG);
@@ -754,7 +749,8 @@ void escriure_leds()
     Serial.println(LED_LOCAL_ROIG);
   }
 }
-
+// LLogica de gestió dels GPI (entrades)
+// CAl adaptar aquesta logica als possibles nous equips a connectar
 void logica_gpi()
 {
   if (debug)
@@ -1570,7 +1566,7 @@ void logica_gpi()
   GPIA_CHANGE = false;
   GPIB_CHANGE = false;
 }
-
+// Lectura dels GPI
 void llegir_gpi()
 {
   // PORT A
@@ -1621,7 +1617,7 @@ void llegir_gpi()
     }
   }
 }
-
+// Escriure la MAc
 // ---------------------------- esp_ now -------------------------
 void printMAC(const uint8_t *mac_addr)
 {
@@ -1630,7 +1626,7 @@ void printMAC(const uint8_t *mac_addr)
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
   Serial.print(macStr);
 }
-
+// Afegir remot
 bool addPeer(const uint8_t *peer_addr)
 { // add pairing Funció per afgir Peers
   memset(&slave, 0, sizeof(slave));
@@ -1663,8 +1659,7 @@ bool addPeer(const uint8_t *peer_addr)
     }
   }
 }
-
-// callback when data is sent
+// Callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
   Serial.print("Last Packet Send Status: ");
@@ -1672,7 +1667,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
   printMAC(mac_addr);
   Serial.println();
 }
-
+// Quan rebem un comunicació
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 {
   Serial.print(len);
@@ -1686,7 +1681,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
   {
     switch (type)
     {
-    case DATA: // the message is data type
+    case DATA: // the message is data type ********** A ELIMINAR
       memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
       // create a JSON document with received data and send it by event to the web page
       root["id"] = incomingReadings.id;
@@ -1770,7 +1765,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
     }
   }
 }
-
+// Menu configuracio
 void Menu_configuracio()
 {
   // local_text_1 = 4; //CONFIG
@@ -1856,7 +1851,7 @@ void Menu_configuracio()
   LOCAL_CHANGE = false;
   post_mode_configuracio = false;
 }
-
+// Detectar mode config
 void detectar_mode_configuracio()
 {
   if (LOCAL_CHANGE)
@@ -1908,7 +1903,7 @@ void detectar_mode_configuracio()
     }
   }
 }
-
+// Inicialitzar ESPNOW
 void initESP_NOW()
 {
   // Init ESP-NOW
@@ -1920,7 +1915,7 @@ void initESP_NOW()
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 }
-
+// SETUP
 void setup()
 {
   // Initialize Serial Monitor
@@ -1945,7 +1940,7 @@ void setup()
   Serial.println(VERSIO);
   Serial.print("Server MAC Address:  ");
   Serial.println(WiFi.macAddress());
-
+  // Imprimim versio
   lcd.setCursor(0, 0); // Situem cursor primer caracter, primera linea
   lcd.print("TALLY MASTER");
   lcd.setCursor(0, 1); // Primer caracter, segona linea
@@ -1955,6 +1950,9 @@ void setup()
   llum.clear();
   llum_rgb(); // Encenem la llum inicial
   // Set the device as a Station and Soft Access Point simultaneously
+
+  // CAL MODIFICAR PER NO FER IMPRESCINDIBLE CONEXIO ROUTER
+
   WiFi.mode(WIFI_AP_STA);
   // Set device as a Wi-Fi Station
   // Haurem de veure que passa si no te una connexió wifi
@@ -2031,7 +2029,7 @@ void setup()
   last_time_verd = millis(); // Debouncer polsador
   LOCAL_CHANGE = false;
 }
-
+// LOOP PRINCIPAL
 void loop()
 {
   if (!mode_configuracio) // Si no estem en mode configuracio
@@ -2060,20 +2058,21 @@ void loop()
     case 2: // Mode 2 Canvia color TX
       escriure_matrix(color_matrix[1][funcio_local]);
       break;
-      // Preparar variables display
-      escriure_display_2(display_text_2[funcio_local]); // TODO Passar la hora
-      // data TALLY SEND
-      comunicar_slaves(); // Enviem les dades rebudes als slaves
     }
-    llegir_hora();
-    escriure_display_clock();
-    static unsigned long lastEventTime = millis();
-    static const unsigned long EVENT_INTERVAL_MS = 5000; // canviar a 20000 x Enviar cada 20 segons informació
-    // Cal canviar el loop per fer-lo quan es rebi un GPIO
-    if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
-    {
-      events.send("ping", NULL, millis()); // Actualitza la web
-      lastEventTime = millis();
-      esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
-    }
+    // Preparar variables display
+    escriure_display_2(display_text_2[funcio_local]);
+    // data TALLY SEND
+    comunicar_slaves(); // Enviem les dades rebudes als slaves
   }
+  llegir_hora();
+  escriure_display_clock();
+  static unsigned long lastEventTime = millis();
+  static const unsigned long EVENT_INTERVAL_MS = 5000; // canviar a 20000 x Enviar cada 20 segons informació
+  // Cal canviar el loop per fer-lo quan es rebi un GPIO
+  if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
+  {
+    events.send("ping", NULL, millis()); // Actualitza la web
+    lastEventTime = millis();
+    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
+  }
+}
