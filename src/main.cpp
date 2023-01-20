@@ -247,10 +247,10 @@ typedef struct struct_message_to_slave
 {
   uint8_t msgType;
   // Borrar - No cal funcio uint8_t funcio;      // Identificador de la funcio del tally
-  bool led_roig[3];        // Array LLUM, COND, PROD llum confirmació cond polsador vermell
-  bool led_verd[3];        // Array LLUM, COND, PROD llum confirmació cond polsador verd
+  bool led_roig[3];       // Array LLUM, COND, PROD llum confirmació cond polsador vermell
+  bool led_verd[3];       // Array LLUM, COND, PROD llum confirmació cond polsador verd
   uint8_t color_tally[3]; // Color principal Array LLUM, COND, PROD Color indexat del tally
-  uint8_t text_2[3];       // Array LLUM, COND, PROD text per mostrar a pantalla
+  uint8_t text_2[3];      // Array LLUM, COND, PROD text per mostrar a pantalla
 } struct_message_to_slave;
 
 // Estrucrtura dades rebuda de slaves
@@ -267,21 +267,28 @@ typedef struct struct_message_from_slave
 typedef struct struct_bateria_info
 {
   uint8_t msgType;
-  uint8_t id;             // Identificador del tally
-  float volts;            // Lectura en volts
-  float percent;          // Percentatge carrega
-  unsigned int readingId; // Identificador de lectura
-} struct__bateria_info;
+  uint8_t id;              // Identificador del tally
+  float bateria_volts;     // Lectura en volts
+  uint8_t bateria_percent; // Percentatge carrega
+} struct_bateria_info;
 
 // Estructura dades per rebre clock
 struct tm timeinfo;
-// TODO
+
+// Estructura per enviar clock a slaves
+typedef struct struct_clock_send
+{
+  uint8_t msgType;
+  tm temps;
+} struct_clock_send;
 
 struct_message incomingReadings;  // Demo original per a eliminar ***********
 struct_message outgoingSetpoints; // Demo original per a eliminar ************
 struct_pairing pairingData;
 struct_message_from_slave fromSlave; // dades del master cap al tally
 struct_message_to_slave toSlave;     // dades del tally cap al master
+struct_bateria_info bat_info;        // Info sobre nivell bateries
+struct_clock_send clocktoSlave;      // Temps per a Slaves
 
 AsyncWebServer server(80);
 AsyncEventSource events("/events");
@@ -379,6 +386,19 @@ obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius ar
 Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
 */
 
+// Llegir la hora
+void llegir_hora()
+{
+  if (!getLocalTime(&timeinfo))
+  {
+    No_time = true; // No hem pogut llegir hora
+  }
+  else
+  {
+    No_time = false; // Hem pogut llegir hora
+  }
+}
+
 void comunicar_slaves()
 {
   toSlave.msgType = TALLY;
@@ -398,6 +418,25 @@ void comunicar_slaves()
   }
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
+  if (result == ESP_OK)
+  {
+    Serial.println("Sent to slaves with success");
+  }
+  else
+  {
+    Serial.println("Error sending to slave data");
+  }
+}
+
+void comunicar_clock()
+{
+  llegir_hora();
+  if (!No_time)
+  {                                // Si hem pogut llegir la hora
+    clocktoSlave.msgType = CLOCK;  // tipus de missatge Clock
+    clocktoSlave.temps = timeinfo; // Li passem la lectura
+  }
+  esp_err_t result = esp_now_send(NULL, (uint8_t *)&clocktoSlave, sizeof(clocktoSlave));
   if (result == ESP_OK)
   {
     Serial.println("Sent to slaves with success");
@@ -568,19 +607,6 @@ void escriure_display_clock()
     lcd.print(":");
     lcd.setCursor(14, 0); // Caracter 14, primera linea
     lcd.print(&timeinfo, "%S");
-  }
-}
-
-// Llegir la hora
-void llegir_hora()
-{
-  if (!getLocalTime(&timeinfo))
-  {
-    No_time = true; // No hem pogut llegir hora
-  }
-  else
-  {
-    No_time = false; // Hem pogut llegir hora
   }
 }
 
@@ -1723,21 +1749,24 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 
     case BATERIA: // Missatge del SLAVE TALLY
       memcpy(&fromSlave, incomingData, sizeof(fromSlave));
+      // create a JSON document with received data and send it by event to the web page
+      root["id"] = bat_info.id;
+      root["bateria_volts"] = bat_info.bateria_volts;
+      root["bateria_percent"] = bat_info.bateria_percent;
+      serializeJson(root, payload);
+      Serial.print("event send :");
+      serializeJson(root, Serial);
+      events.send(payload.c_str(), "new_bateria", millis());
+      Serial.println();
       if (debug)
       {
-        /*
-        Imprimir valors també a web
         Serial.print("Tally ID = ");
-        Serial.println(fromSlave.id)
-            Serial.print("Funció  = ");
-        Serial.println(fromSlave.funcio);
+        Serial.println(bat_info.id);
+        Serial.print("Funció  = ");
+        Serial.println(bat_info.bateria_volts);
         Serial.print("Led roig = ");
-        Serial.println(fromSlave.polsador_roig);
-        Serial.print("Led verd= ");
-        Serial.println(fromSlave.polsador_verd);
-        */
+        Serial.println(bat_info.bateria_percent);
       }
-      // PROCESSAR DADES REBUDES
       break;
 
     case PAIRING: // the message is a pairing request
@@ -2064,15 +2093,17 @@ void loop()
     // data TALLY SEND
     comunicar_slaves(); // Enviem les dades rebudes als slaves
   }
-  llegir_hora();
+  
   escriure_display_clock();
   static unsigned long lastEventTime = millis();
   static const unsigned long EVENT_INTERVAL_MS = 5000; // canviar a 20000 x Enviar cada 20 segons informació
+  llegir_hora();
   // Cal canviar el loop per fer-lo quan es rebi un GPIO
   if ((millis() - lastEventTime) > EVENT_INTERVAL_MS)
   {
     events.send("ping", NULL, millis()); // Actualitza la web
     lastEventTime = millis();
-    esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
+    comunicar_clock();
+    // ORIGINAL: esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
   }
 }
