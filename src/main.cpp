@@ -415,7 +415,9 @@ void comunicar_slaves()
       toSlave.color_tally[i] = color_matrix[1][i]; // Versio Color secundari
       break;
     }
+    toSlave.text_2[i] = TEXT_2[i];
   }
+  
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(NULL, (uint8_t *)&toSlave, sizeof(toSlave));
   if (result == ESP_OK)
