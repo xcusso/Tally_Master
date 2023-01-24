@@ -1,0 +1,85 @@
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+#include <WebSocketsServer.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+const char* WiFi_SSID = "Your_WiFi_SSID"; // LAN
+const char* WiFi_PW = "Your_WiFi_PW";
+const char* AP_SSID = "AP_Name"; // AP and UDP clients
+const char* AP_PW = "AP_Password";
+const char* mDNSname = "lights"; // goto "lights.local" for mDNS enabled browsers and fruit phones
+IPAddress ip(192, 168, 1, 25), gateway(192, 168, 1, 1), subnet(255, 255, 255, 0); // WiFi/LAN, fixed IP for faster (re)connect
+IPAddress broadcastIP(192, 168, 4, 255); // all UDP clients
+ESP8266WebServer server(80);
+WebSocketsServer webSocket(81);
+WiFiUDP UDP;
+const unsigned int localPort = 8888;
+unsigned long connectedMillis;
+byte activeSockets, retryCounter, retries = 16;
+boolean WiFiUp = false; // Wifi flag
+
+void setup() {
+  Serial.begin(74880); // this baudrate also shows ESP-12 startup data
+  Serial.printf("\r\nESP-12 chip ID: %d\r\n", ESP.getChipId());
+  WiFi.setAutoConnect(false);
+  Serial.printf("Scanning for %s\r\n", WiFi_SSID); // if WiFi/LAN is available
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  int n = WiFi.scanNetworks();
+  for (int i = 0; i < n; ++i) {
+    if (WiFi.SSID(i) == WiFi_SSID) {
+      WiFiUp = true;
+      WiFi.mode(WIFI_AP_STA); // LAN and AP and UDP clients
+      WiFi.config(ip, gateway, subnet); // LAN fixed IP
+      WiFi.begin(WiFi_SSID, WiFi_PW); // connect to LAN with credentials
+      Serial.printf("Found %s, trying to connect ", WiFi_SSID);
+      break;
+    }
+    delay(10);
+  }
+  connectWiFi();
+  //startSPIFFS();
+  //startServer();
+  //startWebSocket();
+}
+
+void loop() {
+  if (WiFiUp && !activeSockets && WiFi.status() != WL_CONNECTED && retryCounter < retries && millis() - connectedMillis >= 60000UL * sq(retryCounter)) reconnectWifi();
+  webSocket.loop();
+  //server.handleClient();
+}
+
+void connectWiFi() {
+  if (WiFiUp) {
+    byte w8 = 0;
+    while (WiFi.status() != WL_CONNECTED && w8++ < 15) {
+      delay(333); // try for 5 seconds
+      Serial.print(">");
+    }
+    Serial.printf("\r\n");
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("\tConnected to %s IP address %s strength %d%%\r\n", WiFi_SSID, WiFi.localIP().toString().c_str(), 2 * (WiFi.RSSI() + 100));
+    WiFi.setAutoReconnect(false);
+    retryCounter = 0; // reset counter when connected
+  } else {
+    WiFi.mode(WIFI_AP); // drop station mode if LAN/WiFi is down
+    WiFi.softAP(AP_SSID, AP_PW);
+    Serial.printf("\tLAN Connection failed\r\n\tTry %s AP with IP address %s\r\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+  }
+  if (MDNS.begin(mDNSname)) Serial.printf("mDNS responder started\r\n\tName: %s.local\r\n", mDNSname);
+  else Serial.println("*** Error setting up mDNS responder\r\n");
+  if (UDP.begin(localPort)) Serial.printf("Broadcasting UDP on %s AP with IP address %s port %d\r\n", AP_SSID, WiFi.softAPIP().toString().c_str(), localPort);
+  else Serial.println("*** Error setting up UDP\r\n");
+}
+
+void reconnectWifi() {
+  connectedMillis = millis(); // update
+  retryCounter ++; // update connection retries
+  WiFi.mode(WIFI_AP_STA); // LAN and AP and UDP clients
+  WiFi.begin(); // connect to LAN
+  Serial.printf("Trying to reconnect to %s, attempt %d ", WiFi_SSID, retryCounter);
+  connectWiFi();
+}

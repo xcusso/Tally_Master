@@ -110,7 +110,7 @@ const uint8_t COLOR[8][3] = {{0, 0, 0},        // 0- NEGRE
                              {255, 200, 125}}; // 7- BLANC
 
 const char *ntpServer = "pool.ntp.org";              // Servidors de temps
-const long gmtOffset_sec = 0;                        // Hora GMT
+const long gmtOffset_sec = 3600;                        // Hora GMT
 const int daylightOffset_sec = 3600;                 // Desfase Estiu-hivern
 bool No_time = true;                                 // No tenim sincro amb hora
 uint8_t funcio_local = 0;                            // 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
