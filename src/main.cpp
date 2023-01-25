@@ -39,6 +39,10 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include <Adafruit_NeoPixel.h> //Control neopixels
 #include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
+// #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+// ATENCIO: La versió de llibreria del WifiManager a gener del 2023 no accepta ESP32
+// Cal posar en local la versió 2.0.xxx (en el meu cas 2.0.15-rc.1) dins la carpeta
+// De llibreries locals
 #include "time.h"              //Donar hora real
 
 #define VERSIO "M1.2" // Versió del software
@@ -415,7 +419,7 @@ void comunicar_slaves()
       toSlave.color_tally[i] = color_matrix[1][i]; // Versio Color secundari
       break;
     }
-    toSlave.text_2[i] = TEXT_2[i];
+    toSlave.text_2[i] = display_text_2[i];
   }
   
   // Send message via ESP-NOW
