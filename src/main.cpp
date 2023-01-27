@@ -39,7 +39,6 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include <Adafruit_NeoPixel.h> //Control neopixels
 #include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
-#include "SPIFFS.h"            //Per poder guardar fitxers locals /data
 #include "time.h"              //Donar hora real
 
 #define VERSIO "M1.2" // Versió del software
@@ -99,40 +98,6 @@ Adafruit_PCF8575 GPEXTB; //(0x22); // A1 a VDD
 
 // Declarem neopixels
 Adafruit_NeoPixel llum(LED_COUNT, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
-/*
-// Connect Manager
-// Search for parameter in HTTP POST request
-const char *PARAM_INPUT_1 = "ssid";
-const char *PARAM_INPUT_2 = "pass";
-const char *PARAM_INPUT_3 = "ip";
-const char *PARAM_INPUT_4 = "gateway";
-
-// Variables to save values from HTML form
-String ssid;
-String pass;
-String ip;
-String gateway;
-
-// File paths to save input values permanently
-
-const char *ssidPath = "/ssid.txt";
-const char *passPath = "/pass.txt";
-const char *ipPath = "/ip.txt";
-const char *gatewayPath = "/gateway.txt";
-
-
-IPAddress localIP;
-// IPAddress localIP(192, 168, 1, 200); // hardcoded
-
-// Set your Gateway IP address
-IPAddress localGateway;
-// IPAddress localGateway(192, 168, 1, 1); //hardcoded
-IPAddress subnet(255, 255, 255, 0);
-
-// Timer variables
-unsigned long previousMillis = 0;
-const long interval = 10000; // interval to wait for Wi-Fi connection (milliseconds)
-*/
 
 // Definim els colors RGB
 const uint8_t COLOR[8][3] = {{0, 0, 0},        // 0- NEGRE
@@ -420,102 +385,6 @@ if (!!window.EventSource) {
 obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius arriben.
 Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
 */
-
-// PRINCIPI WIFIMANAGER *****************************************
-
-// Initialize SPIFFS
-void initSPIFFS()
-{
-  if (!SPIFFS.begin(true))
-  {
-    Serial.println("An error has occurred while mounting SPIFFS");
-  }
-  Serial.println("SPIFFS mounted successfully");
-}
-
-// Read File from SPIFFS
-String readFile(fs::FS &fs, const char *path)
-{
-  Serial.printf("Reading file: %s\r\n", path);
-
-  File file = fs.open(path);
-  if (!file || file.isDirectory())
-  {
-    Serial.println("- failed to open file for reading");
-    return String();
-  }
-
-  String fileContent;
-  while (file.available())
-  {
-    fileContent = file.readStringUntil('\n');
-    break;
-  }
-  return fileContent;
-}
-
-// Write file to SPIFFS
-void writeFile(fs::FS &fs, const char *path, const char *message)
-{
-  Serial.printf("Writing file: %s\r\n", path);
-
-  File file = fs.open(path, FILE_WRITE);
-  if (!file)
-  {
-    Serial.println("- failed to open file for writing");
-    return;
-  }
-  if (file.print(message))
-  {
-    Serial.println("- file written");
-  }
-  else
-  {
-    Serial.println("- frite failed");
-  }
-}
-
-/*
-// Initialize WiFi
-bool initWiFi()
-{
-  if (ssid == "" || ip == "")
-  {
-    Serial.println("Undefined SSID or IP address.");
-    return false;
-  }
-
-  WiFi.mode(WIFI_AP_STA);
-  localIP.fromString(ip.c_str());
-  localGateway.fromString(gateway.c_str());
-
-  if (!WiFi.config(localIP, localGateway, subnet))
-  {
-    Serial.println("STA Failed to configure");
-    return false;
-  }
-  WiFi.begin(ssid.c_str(), pass.c_str());
-  Serial.println("Connecting to WiFi...");
-
-  unsigned long currentMillis = millis();
-  previousMillis = currentMillis;
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    currentMillis = millis();
-    if (currentMillis - previousMillis >= interval)
-    {
-      Serial.println("Failed to connect.");
-      return false;
-    }
-  }
-
-  Serial.println(WiFi.localIP());
-  return true;
-}
-*/
-
-// FINAL WIFIMANAGER **************************
 
 // Llegir la hora
 void llegir_hora()
@@ -2088,8 +1957,6 @@ void setup()
   // Initialize Serial Monitor
   Serial.begin(115200);
 
-  initSPIFFS();
-
   lcd.init();      // Inicialitzem lcd
   lcd.backlight(); // Arrenquem la llum de fons lcd
   lcd.clear();     // Esborrem la pantalla
@@ -2120,149 +1987,15 @@ void setup()
   llum_rgb(); // Encenem la llum inicial
   // Set the device as a Station and Soft Access Point simultaneously
 
-/*
-  // Load values saved in SPIFFS
-  ssid = readFile(SPIFFS, ssidPath);
-  pass = readFile(SPIFFS, passPath);
-  ip = readFile(SPIFFS, ipPath);
-  gateway = readFile(SPIFFS, gatewayPath);
-  Serial.println(ssid);
-  Serial.println(pass);
-  Serial.println(ip);
-  Serial.println(gateway);
-*/
+  WiFi.mode(WIFI_AP_STA);
 
-  WiFi.mode(WIFI_AP_STA); // CANVI A WIFIMANAGER
-  // Set device as a Wi-Fi Station
-  // Haurem de veure que passa si no te una connexió wifi
-
-   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/html", index_html); });
-
-    // Events
-
-    events.onConnect([](AsyncEventSourceClient *client)
-                     {
-    if(client->lastId()){
-      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
-    }
-    // send event with message "hello!", id current millis
-    // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000); });
-    server.addHandler(&events);
-
-  /*
-  if (initWiFi())
-  {
-    // Route for root / web page
-    // ELIMINAT PQ JA TENIM PAGINA
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/html", index_html); });
-
-    // Events
-
-    events.onConnect([](AsyncEventSourceClient *client)
-                     {
-    if(client->lastId()){
-      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
-    }
-    // send event with message "hello!", id current millis
-    // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000); });
-    server.addHandler(&events);
-
-    /*
-    // Route to set GPIO state to HIGH
-    server.on("/on", HTTP_GET, [](AsyncWebServerRequest *request)
-              {
-      digitalWrite(ledPin, HIGH);
-      request->send(SPIFFS, "/index.html", "text/html", false, processor); });
-
-    // Route to set GPIO state to LOW
-    server.on("/off", HTTP_GET, [](AsyncWebServerRequest *request)
-              {
-      digitalWrite(ledPin, LOW);
-      request->send(SPIFFS, "/index.html", "text/html", false, processor); });
-     */
-    // FINAL PAGIMNA EXEMPLE - CAL ELIMINAR
-    /*
-    server.begin();
-  }
-  else
-  {
-    // Connect to Wi-Fi network with SSID and password
-    Serial.println("Setting AP (Access Point)");
-    // NULL sets an open Access Point
-    WiFi.softAP("ESP-WIFI-MANAGER", NULL);
-
-    IPAddress IP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
-    Serial.println(IP);
-
-    // Web Server Root URL
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(SPIFFS, "/wifimanager.html", "text/html"); });
-
-    server.serveStatic("/", SPIFFS, "/");
-
-    server.on("/", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-      int params = request->params();
-      for(int i=0;i<params;i++){
-        AsyncWebParameter* p = request->getParam(i);
-        if(p->isPost()){
-          // HTTP POST ssid value
-          if (p->name() == PARAM_INPUT_1) {
-            ssid = p->value().c_str();
-            Serial.print("SSID set to: ");
-            Serial.println(ssid);
-            // Write file to save value
-            writeFile(SPIFFS, ssidPath, ssid.c_str());
-          }
-          // HTTP POST pass value
-          if (p->name() == PARAM_INPUT_2) {
-            pass = p->value().c_str();
-            Serial.print("Password set to: ");
-            Serial.println(pass);
-            // Write file to save value
-            writeFile(SPIFFS, passPath, pass.c_str());
-          }
-          // HTTP POST ip value
-          if (p->name() == PARAM_INPUT_3) {
-            ip = p->value().c_str();
-            Serial.print("IP Address set to: ");
-            Serial.println(ip);
-            // Write file to save value
-            writeFile(SPIFFS, ipPath, ip.c_str());
-          }
-          // HTTP POST gateway value
-          if (p->name() == PARAM_INPUT_4) {
-            gateway = p->value().c_str();
-            Serial.print("Gateway set to: ");
-            Serial.println(gateway);
-            // Write file to save value
-            writeFile(SPIFFS, gatewayPath, gateway.c_str());
-          }
-          //Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
-        }
-      }
-      request->send(200, "text/plain", "Done. ESP will restart, connect to your router and go to IP address: " + ip);
-      delay(3000);
-      ESP.restart(); });
-    server.begin();
-  }
-  */
- server.begin();
-
-  /*
-  // Connexió original
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(1000);
     Serial.println("Setting as a Wi-Fi Station..");
   }
-  */
+
   Serial.print("Server SOFT AP MAC Address:  ");
   Serial.println(WiFi.softAPmacAddress());
 
@@ -2274,7 +2007,6 @@ void setup()
 
   initESP_NOW(); // Iniciem el EspNow
 
-  /*
   // Start Web server
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/html", index_html); });
@@ -2291,8 +2023,8 @@ void setup()
   server.addHandler(&events);
 
   // start server
-  // server.begin(); ***** ESTA POSAT DINS EL WIFIMANAGER
-  */
+  server.begin();
+  
   if (!GPEXTA.begin(0x20, &Wire))
   {
     Serial.println("Couldn't find PCF8575 A");
