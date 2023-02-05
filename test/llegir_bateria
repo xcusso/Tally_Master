@@ -1,0 +1,48 @@
+/*
+Codi en C que mostra com llegir els volts d'una bateria 18650
+connectada a través de dos diodes en sèrie amb una entrada analògica d'un ESP32 
+i convertir-los en un percentatge.
+
+Aquest codi utilitza la biblioteca Adafruit_ADC per llegir el valor analògic des de l'entrada analògica de l'ESP32. 
+El valor analògic es llegeix en un bucle que es repeteix NUM_SAMPLES vegades i es mitjana per obtenir una mesura més precisa.
+
+Després, el codi utilitza la tensió mesurada per calcular el percentatge de bateria restant en 
+comparació amb les tensions plenes i buides de la bateria (definides com a FULL_VOLTAGE i EMPTY_VOLTAGE, respectivament). 
+El resultat s'imprimeix a través del port sèrie per a una visualització fàcil.
+
+CODI GENERAT PER CHATGPT
+*/
+
+
+#include <Adafruit_Sensor.h>
+#include <Adafruit_ADC.h>
+#include <WiFi.h>
+
+#define ADC_PIN 35
+#define FULL_VOLTAGE 4.2
+#define EMPTY_VOLTAGE 3.3
+#define NUM_SAMPLES 10
+
+Adafruit_ADC *adc;
+
+void setup() {
+  Serial.begin(115200);
+  adc = new Adafruit_ADC(ADC_PIN);
+}
+
+void loop() {
+  float voltage = 0;
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    voltage += (float)adc->read() * 3.3 / 4096;
+  }
+  voltage /= NUM_SAMPLES;
+  voltage = voltage * 2;
+  int batteryPercentage = 100 * (voltage - EMPTY_VOLTAGE) / (FULL_VOLTAGE - EMPTY_VOLTAGE);
+  Serial.print("Battery voltage: ");
+  Serial.print(voltage);
+  Serial.print(" V");
+  Serial.print("Battery percentage: ");
+  Serial.print(batteryPercentage);
+  Serial.println("%");
+  delay(1000);
+}
