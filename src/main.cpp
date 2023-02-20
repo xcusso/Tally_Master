@@ -12,7 +12,6 @@ Gestio pagina web
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
-Lectura valors reals bateria
 Indicacions bicolors: No es veuen be. Cal provar amb un altre sistema.
 Hauria de poder funcionar sense WIFI. Ara es queda esperant WIFI.
 
@@ -141,11 +140,10 @@ bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
 bool led_roig[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
 bool led_verd[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
+//Valor bateria
 float bat_local_volt = 0;      // Variable per lectura local de la bateria volts
 uint8_t bat_local_percent = 0; // Variable per lectura local de la bateria percntil
 
-
-// uint16_t BATTERY_LOCAL_READ[] = {0, 0}; ****  A ELIMINAR
 
 // Variables GPIO
 // Fem arrays de dos valors. El primer valor 0 és anterior la 1 actual
@@ -272,7 +270,8 @@ String TEXT_2[] = {"                ",  // 0
                    "* ON AIR LOCAL *",  // 17
                    "<MODE TALLY    >",  // 18
                    "<MODE CONDUCTOR>",  // 19
-                   "<MODE PRODUCTOR>"}; // 20
+                   "<MODE PRODUCTOR>",  // 20
+                   " BATERIA BAIXA! "}; // 21
 
 
 
@@ -713,15 +712,15 @@ void escriure_display_clock()
   }
   else
   {
-    lcd.setCursor(8, 0); // Caracter 8, primera linea
+    lcd.setCursor(7, 0); // Caracter 7, primera linea
     lcd.print(&timeinfo, "%H");
+    lcd.setCursor(9, 0); // Caracter 9, primera linea
+    lcd.print(":");
     lcd.setCursor(10, 0); // Caracter 10, primera linea
-    lcd.print(":");
-    lcd.setCursor(11, 0); // Caracter 11, primera linea
     lcd.print(&timeinfo, "%M");
-    lcd.setCursor(13, 0); // Caracter 13, primera linea
+    lcd.setCursor(12, 0); // Caracter 12, primera linea
     lcd.print(":");
-    lcd.setCursor(14, 0); // Caracter 14, primera linea
+    lcd.setCursor(13, 0); // Caracter 13, primera linea
     lcd.print(&timeinfo, "%S");
   }
 }
@@ -2069,7 +2068,7 @@ void setup()
 
   lcd.init();      // Inicialitzem lcd
   lcd.backlight(); // Arrenquem la llum de fons lcd
-  // Creem els icons de
+  // Creem els icons de la bateria
   lcd.createChar(0,baticon[0]); //0%
   lcd.createChar(1,baticon[1]); //20%
   lcd.createChar(2,baticon[2]); //40%
