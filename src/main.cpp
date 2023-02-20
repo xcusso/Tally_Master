@@ -170,7 +170,7 @@ bool post_mode_configuracio = false;     // Final configuració
 
 // Temps per rutines lectura bateria
 unsigned long ultima_lectura_bat;
-const unsigned long interval_lectura_bat = 300000; //Cada 5 minuts - ajustar si cal
+const unsigned long interval_lectura_bat = 3000; //Cada 5 minuts (5*60*1000 = 300000) - ajustar si cal
 
 // Text linea 2 que envia MASTER
 uint8_t display_text_1[] = {0, 0, 0}; // Primera linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
@@ -385,11 +385,13 @@ const char index_html[] PROGMEM = R"rawliteral(
     .card { background-color: white; box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5); }
     .cards { max-width: 700px; margin: 0 auto; display: grid; grid-gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
     .reading { font-size: 2.8rem; }
+    .funcio { font-size: 1.2rem; }
+    .polsador { font-size: 1.2rem; }
     .packet { color: #bebebe; }
     .card.temperature { color: #fd7e14; }
     .card.humidity { color: #1b78e2; }
     .card.operativa { color: #fd7e14; }
-    .card.estat { color: #1b78e2; }
+    .card.bateria { color: #3fe21b; }
   </style>
 </head>
 <body>
@@ -399,10 +401,10 @@ const char index_html[] PROGMEM = R"rawliteral(
   <div class="content">
     <div class="cards">
       <div class="card operativa">
-        <h4> TALLY 1 - OPERACIO</h4><p><span class="reading"><span id="f1"></span><span id="br1"></span><span id="bv1"></span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
+        <h4> TALLY MASTER </h4><p><span class="funcio"> Funcio: <span id="f0"></span></p><span class="polsador" Polsador Roig: <span id="pr0"><p><span> Polsador Verd: <span id="pv0"></span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
       </div>
-      <div class="card estat">
-        <h4> TALLY 1 - BATERIA</h4><p><span class="reading"><span id="h1"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="rh1"></span></p>
+      <div class="card bateria">
+        <h4> TALLY 1 - BATERIA</h4><p><span class="reading"><span id="batperc0"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="batvolt0"></span></p>
       </div>
       <div class="card temperature">
         <h4><i class="fas fa-thermometer-half"></i> TALLY 1 </h4><p><span class="reading"><span id="t1"></span> &deg;C</span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
@@ -447,18 +449,29 @@ if (!!window.EventSource) {
  source.addEventListener('new_operativa', function(e) {
   console.log("new_operativa", e.data);
   var obj = JSON.parse(e.data);
-  document.getElementById("f"+obj.id).innerHTML = obj.funcio.toFixed(2);
-  document.getElementById("br"+obj.id).innerHTML = obj.boto_roig.toFixed(2);
-  document.getElementById("bv"+obj.id).innerHTML = obj.boto_verd.toFixed(2);
+  document.getElementById("f"+obj.id).innerHTML = obj.funcio;
+  document.getElementById("pr"+obj.id).innerHTML = obj.polsador_roig;
+  document.getElementById("pv"+obj.id).innerHTML = obj.polsador_verd;
  }, false);
+
+ source.addEventListener('new_bateria', function(e) {
+  console.log("new_bateria", e.data);
+  var obj = JSON.parse(e.data);
+  document.getElementById("batvolt"+obj.id).innerHTML = obj.bateria_volts.toFixed(2);
+  document.getElementById("batperc"+obj.id).innerHTML = obj.bateria_percent.toFixed(2);
+ }, false);
+
 }
 </script>
 </body>
 </html>)rawliteral";
 
 /* Notes
-obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius arriben.
+
 Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
+
+La funció "toFixed()" s'utilitza per limitar el nombre de decimals mostrats.
+obj.temperature.toFixed(2); mostra nomes dos decimals de la temperatura
 */
 
 
@@ -748,6 +761,45 @@ void escriure_matrix(uint8_t color)
     Serial.print("B: ");
     Serial.println(B);
   }
+}
+
+// INTERFACE WEB!!!
+// Aqui creem els valors del TALLY MASTER 0
+
+void web_funcio_local() 
+{
+      // Creem un JSON i l'enviem com event a la pagina web amb funció i polsadors
+      StaticJsonDocument<1000> root;
+      String payload;
+      root["id"] = BOARD_ID;
+      switch (funcio_local)
+      {
+        case 0: 
+         root["funcio"] = "Tally";
+         break;
+        case 1: 
+         root["funcio"] = "Conductor";
+         break;
+        case 2: 
+         root["funcio"] = "Productor";
+         break;
+      }
+      root["polsador_roig"] = POLSADOR_LOCAL_ROIG[1];
+      root["polsador_verd"] = POLSADOR_LOCAL_VERD[1];
+      serializeJson(root, payload);
+      events.send(payload.c_str(), "new_operativa", millis());
+}
+
+void web_bateria_local() 
+{
+      // Creem un JSON i l'enviem com event a la pagina web amb estat bateria
+      StaticJsonDocument<1000> root;
+      String payload;
+      root["id"] = BOARD_ID;
+      root["bateria_volts"] = bat_local_volt;
+      root["bateria_percent"] = bat_local_percent;
+      serializeJson(root, payload);
+      events.send(payload.c_str(), "new_bateria", millis());
 }
 
 // Llum arrencada
@@ -1877,9 +1929,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
       {
         Serial.print("Tally ID = ");
         Serial.println(bat_info.id);
-        Serial.print("Funció  = ");
+        Serial.print("Volts  = ");
         Serial.println(bat_info.bateria_volts);
-        Serial.print("Led roig = ");
+        Serial.print("Percentatge = ");
         Serial.println(bat_info.bateria_percent);
       }
       break;
@@ -2190,6 +2242,7 @@ void loop()
     if (LOCAL_CHANGE)
     {                            // Si hem apretat algun polsador
       logica_polsadors_locals(); // Apliquem la lógica polsadors locals
+      web_funcio_local(); // Dibuixem al web el valor apretat
     }
   }
   llegir_gpi(); // Llegim els gpi
@@ -2235,7 +2288,7 @@ void loop()
     llegir_bateria();
     mostrar_bat();
     ultima_lectura_bat = millis();
-    // CAL DIBUIXAR INTERFACE WEB AMB VALOR
+    web_bateria_local(); //Forcem escriptura al web
     
   }
 }
