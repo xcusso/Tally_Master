@@ -30,12 +30,14 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
   Based on JC Servaye example: https://github.com/Servayejc/esp_now_web_server/
 */
 
-#include <Arduino.h>
-#include <esp_now.h>
-#include <WiFi.h>
+#include <Arduino.h>           
+#include <esp_now.h>           //Modul Espnow
+#include <WiFi.h>              //Modul Wifi
 #include "ESPAsyncWebServer.h"
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
+#include <Adafruit_Sensor.h>   //Lectura sensor
+#include <Adafruit_ADC.h>      //Lectura conversor analogic
 #include <Adafruit_NeoPixel.h> //Control neopixels
 #include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
@@ -84,6 +86,9 @@ bool debug = true;
 
 // Define sensor battery
 #define BATTERY_PIN 36
+#define FULL_VOLTAGE 4.2
+#define EMPTY_VOLTAGE 3.3
+#define NUM_SAMPLES 10
 
 // Definim PINS
 
@@ -138,7 +143,11 @@ bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
 bool led_roig[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
 bool led_verd[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
-uint16_t BATTERY_LOCAL_READ[] = {0, 0};
+float batvolt = 0;      // Variable per lectura local de la bateria volts
+uint8_t batpercent = 0; // Variable per lectura local de la bateria percntil
+
+
+// uint16_t BATTERY_LOCAL_READ[] = {0, 0}; ****  A ELIMINAR
 
 // Variables GPIO
 // Fem arrays de dos valors. El primer valor 0 és anterior la 1 actual
@@ -167,9 +176,72 @@ bool post_mode_configuracio = false;     // Final configuració
 uint8_t display_text_1[] = {0, 0, 0}; // Primera linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 uint8_t display_text_2[] = {0, 0, 0}; // Segona linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 
-//     TEXT_1[] = "12345678""90123456"
-//                          "HH:MM:SS"
-//                          "NO CLOCK"
+// Icones bateria
+byte baticon[8][6] = {
+    {
+        B01110, // 0%
+        B11111,
+        B10001,
+        B10001,
+        B10001,
+        B10001,
+        B10001,
+        B11111,
+    },
+    {
+        B01110, // 20%
+        B11111,
+        B10001,
+        B10001,
+        B10001,
+        B10001,
+        B11111,
+        B11111,
+    },
+    {
+        B01110, // 40%
+        B11111,
+        B10001,
+        B10001,
+        B10001,
+        B11111,
+        B11111,
+        B11111,
+    },
+    {
+        B01110, // 60%
+        B11111,
+        B10001,
+        B10001,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+    },
+    {
+        B01110, // 80%
+        B11111,
+        B10001,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+    },
+    {
+        B01110, //100%
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+        B11111,
+    }};
+
+//     TEXT_1[] =  "12345678""90123456"
+//                           "HH:MM:SS"
+//                           "NO CLOCK"
 String TEXT_1[] = {"       ",  // 0
                    " TALLY ",  // 1
                    " COND  ",  // 2
@@ -199,6 +271,8 @@ String TEXT_2[] = {"                ",  // 0
                    "<MODE TALLY    >",  // 18
                    "<MODE CONDUCTOR>",  // 19
                    "<MODE PRODUCTOR>"}; // 20
+
+
 
 // Replace with your network credentials (STATION)
  const char *ssid = "exteriors";
@@ -453,22 +527,21 @@ void comunicar_clock()
   }
 }
 
-// Simulem lectura de bateria
-// TODO Unificar lectura volts i convertir a nivells
-// BAteria 4,2V - 3,2V si posem dos diodes en serie
+// lectura bateria
+// Bateria 4,2V - 3,2V si posem dos diodes en serie ens queda en 4.2 - 1.4 = 2,8 Max
+// 3,2V -1,4 = 1,8 Min
 
-float readBateriaVolts()
+void readBateria()
 {
-  float volt = random(0, 40); // = analogRead(BATTERY_PIN)
-  return volt;
+  batvolt = 0;
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    batvolt += (float)adc->read() * 3.3 / 4096;
+  }
+  batvolt /= NUM_SAMPLES; //Fem la mitjana de les lectures
+  batvolt = batvolt + 1.4; //Compensem la caiguda de tensió de 2 diodes en serie 0.7 + 0.7V
+  batpercent = 100 * (batvolt - EMPTY_VOLTAGE) / (FULL_VOLTAGE - EMPTY_VOLTAGE);
 }
 
-// Simulem lectura percentatge bateria
-float readBateriaPercent()
-{
-  uint8_t percent = random(0, 100);
-  return percent;
-}
 // Logica dels GPO
 void logica_GPO()
 {
@@ -1960,6 +2033,8 @@ void setup()
   lcd.init();      // Inicialitzem lcd
   lcd.backlight(); // Arrenquem la llum de fons lcd
   lcd.clear();     // Esborrem la pantalla
+
+  adc = new Adafruit_ADC(BATTERY_PIN); // Lectura de la bateria
 
   Serial.println();
 
