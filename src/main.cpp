@@ -8,7 +8,10 @@
 /*
 TODO
 Avisar quan es connecti i reconecti
-Gestio pagina web
+Millorar pagina web
+Gestió de bombetes WIFI
+
+Versió TALLY Mobil
 
 Poder selecionar el WIFI LOCAL
 WEb display per veure tally operatius, bateries i funcions
@@ -387,6 +390,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     .reading { font-size: 2.8rem; }
     .funcio { font-size: 1.2rem; }
     .polsador { font-size: 1.2rem; }
+    .bateria { font-size: 1.2rem; }
     .packet { color: #bebebe; }
     .card.temperature { color: #fd7e14; }
     .card.humidity { color: #1b78e2; }
@@ -396,12 +400,33 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="topnav">
-    <h3>TALLY MASTER</h3>
+    <h3>TALLY SISTEM</h3>
   </div>
   <div class="content">
     <div class="cards">
       <div class="card operativa">
-        <h4> TALLY MASTER </h4><p><span class="funcio"> Funcio: <span id="f0"></span></p><span class="polsador" Polsador Roig: <span id="pr0"><p><span> Polsador Verd: <span id="pv0"></span></p><p class="packet">Reading ID: <span id="rt1"></span></p>
+        <h4> TALLY MASTER </h4>
+        <p><span class="funcio"> Funcio: <span id="f0"></span></p>
+        <p><span class="polsador"> Polsador Roig: </span><span id="pr0"></span></p>
+        <p><span> Polsador Verd: </span><span id="pv0"></span></p>
+        <p><span class="bateria"> Bateria: </span></p>
+        <p><span class="bateria"><span id="batperc0"></span> &percnt;</span><span id="batvolt0"></span> Volt </span></p>
+      </div>
+      <div class="card operativa">
+        <h4> TALLY 1 </h4>
+        <p><span class="funcio"> Funcio: <span id="f1"></span></p>
+        <p><span class="polsador"> Polsador Roig: </span><span id="pr0"></span></p>
+        <p><span> Polsador Verd: </span><span id="pv1"></span></p>
+        <p><span class="bateria"> Bateria: </span></p>
+        <p><span class="bateria"><span id="batperc1"></span> &percnt;</span><span id="batvolt1"></span> Volt </span></p>
+      </div>
+      <div class="card operativa">
+        <h4> TALLY 2 </h4>
+        <p><span class="funcio"> Funcio: <span id="f2"></span></p>
+        <p><span class="polsador"> Polsador Roig: </span><span id="pr2"></span></p>
+        <p><span> Polsador Verd: </span><span id="pv2"></span></p>
+        <p><span class="bateria"> Bateria: </span></p>
+        <p><span class="bateria"><span id="batperc2"></span> &percnt;</span><span id="batvolt2"></span> Volt </span></p>
       </div>
       <div class="card bateria">
         <h4> TALLY 1 - BATERIA</h4><p><span class="reading"><span id="batperc0"></span> &percnt;</span></p><p class="packet">Reading ID: <span id="batvolt0"></span></p>
@@ -464,7 +489,8 @@ if (!!window.EventSource) {
 }
 </script>
 </body>
-</html>)rawliteral";
+</html>
+)rawliteral";
 
 /* Notes
 
