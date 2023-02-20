@@ -36,8 +36,6 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include "ESPAsyncWebServer.h"
 #include "AsyncTCP.h"
 #include <ArduinoJson.h>
-#include <Adafruit_Sensor.h>   //Lectura sensor
-#include <Adafruit_ADC.h>      //Lectura conversor analogic
 #include <Adafruit_NeoPixel.h> //Control neopixels
 #include <Adafruit_PCF8575.h>  //Expansió I2C GPIO
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
@@ -177,7 +175,7 @@ uint8_t display_text_1[] = {0, 0, 0}; // Primera linea 0 = TALLY, 1 = CONDUCTOR,
 uint8_t display_text_2[] = {0, 0, 0}; // Segona linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
 
 // Icones bateria
-byte baticon[8][6] = {
+byte baticon[6][8] = {
     {
         B01110, // 0%
         B11111,
@@ -535,7 +533,7 @@ void readBateria()
 {
   batvolt = 0;
   for (int i = 0; i < NUM_SAMPLES; i++) {
-    batvolt += (float)adc->read() * 3.3 / 4096;
+    batvolt += analogRead(BATTERY_PIN) * 3.3 / 4096;
   }
   batvolt /= NUM_SAMPLES; //Fem la mitjana de les lectures
   batvolt = batvolt + 1.4; //Compensem la caiguda de tensió de 2 diodes en serie 0.7 + 0.7V
@@ -2033,8 +2031,6 @@ void setup()
   lcd.init();      // Inicialitzem lcd
   lcd.backlight(); // Arrenquem la llum de fons lcd
   lcd.clear();     // Esborrem la pantalla
-
-  adc = new Adafruit_ADC(BATTERY_PIN); // Lectura de la bateria
 
   Serial.println();
 
