@@ -41,7 +41,7 @@ https://randomnerdtutorials.com/esp-now-auto-pairing-esp32-esp8266/
 #include <LiquidCrystal_I2C.h> //Control display cristall liquid
 #include "time.h"              //Donar hora real
 
-#define VERSIO "M1.2" // Versió del software
+#define VERSIO "M1.3" // Versió del software
 
 // Bool per veure missatges de debug
 bool debug = true;
@@ -141,8 +141,8 @@ bool LED_LOCAL_ROIG = false;
 bool LED_LOCAL_VERD = false;
 bool led_roig[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
 bool led_verd[] = {false, false, false}; // 0 = Tally, 1 = COND, 2 = PROD
-float batvolt = 0;      // Variable per lectura local de la bateria volts
-uint8_t batpercent = 0; // Variable per lectura local de la bateria percntil
+float bat_local_volt = 0;      // Variable per lectura local de la bateria volts
+uint8_t bat_local_percent = 0; // Variable per lectura local de la bateria percntil
 
 
 // uint16_t BATTERY_LOCAL_READ[] = {0, 0}; ****  A ELIMINAR
@@ -169,6 +169,10 @@ unsigned long temps_post_config = 0;     // Temps per sortir config
 bool pre_mode_configuracio = false;      // Inici mode configuració
 bool mode_configuracio = false;          // Mode configuració
 bool post_mode_configuracio = false;     // Final configuració
+
+// Temps per rutines lectura bateria
+unsigned long ultima_lectura_bat;
+const unsigned long interval_lectura_bat = 300000; //Cada 5 minuts - ajustar si cal
 
 // Text linea 2 que envia MASTER
 uint8_t display_text_1[] = {0, 0, 0}; // Primera linea 0 = TALLY, 1 = CONDUCTOR, 2 = PRODUCTOR
@@ -458,6 +462,22 @@ obj.temperature.toFixed(2); El dos del parentesis es per saber quants matrius ar
 Per imprimir la variable posem el nom de la variable seguit del numero de registre "id"
 */
 
+
+// lectura bateria
+// Bateria 4,2V - 3,2V si posem dos diodes en serie ens queda en 4.2 - 1.4 = 2,8 Max
+// 3,2V -1,4 = 1,8 Min
+
+void llegir_bateria()
+{
+  bat_local_volt = 0;
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    bat_local_volt += analogRead(BATTERY_PIN) * 3.3 / 4096;
+  }
+  bat_local_volt /= NUM_SAMPLES; //Fem la mitjana de les lectures
+  bat_local_volt = bat_local_volt + 1.4; //Compensem la caiguda de tensió de 2 diodes en serie 0.7 + 0.7V
+  bat_local_percent = 100 * (bat_local_volt - EMPTY_VOLTAGE) / (FULL_VOLTAGE - EMPTY_VOLTAGE);
+}
+
 // Llegir la hora
 void llegir_hora()
 {
@@ -523,21 +543,6 @@ void comunicar_clock()
   {
     Serial.println("Error sending to slave clock");
   }
-}
-
-// lectura bateria
-// Bateria 4,2V - 3,2V si posem dos diodes en serie ens queda en 4.2 - 1.4 = 2,8 Max
-// 3,2V -1,4 = 1,8 Min
-
-void readBateria()
-{
-  batvolt = 0;
-  for (int i = 0; i < NUM_SAMPLES; i++) {
-    batvolt += analogRead(BATTERY_PIN) * 3.3 / 4096;
-  }
-  batvolt /= NUM_SAMPLES; //Fem la mitjana de les lectures
-  batvolt = batvolt + 1.4; //Compensem la caiguda de tensió de 2 diodes en serie 0.7 + 0.7V
-  batpercent = 100 * (batvolt - EMPTY_VOLTAGE) / (FULL_VOLTAGE - EMPTY_VOLTAGE);
 }
 
 // Logica dels GPO
@@ -664,12 +669,46 @@ void escriure_display_2(uint8_t txt2)
   lcd.print(TEXT_2[txt2]);
 }
 
+// Dibuixem bateria en Display
+void escriure_display_bateria(uint8_t bat_icona_percent)
+{
+  lcd.setCursor(15, 0); // Ultimr caracter, primera linea
+  lcd.write((byte)bat_icona_percent);
+}
+// Seleccionem icona nivell bateria
+void mostrar_bat()
+{
+  if (bat_local_percent < 10)
+  {
+    escriure_display_bateria(0);
+  }
+  if (bat_local_percent > 10 && bat_local_percent < 20)
+  {
+    escriure_display_bateria(1);
+  }
+  if (bat_local_percent > 20 && bat_local_percent < 40)
+  {
+    escriure_display_bateria(2);
+  }
+  if (bat_local_percent > 40 && bat_local_percent < 60)
+  {
+    escriure_display_bateria(3);
+  }
+  if (bat_local_percent > 60 && bat_local_percent < 80)
+  {
+    escriure_display_bateria(4);
+  }
+  if (bat_local_percent > 80)
+  {
+    escriure_display_bateria(5);
+  }
+}
 // Dibuxem tercer fragment Display (hora)
 void escriure_display_clock()
 {
   if (No_time)
   {
-    lcd.setCursor(8, 0);   // Caracter 8, primera linea
+    lcd.setCursor(7, 0);   // Caracter 7, primera linea
     lcd.print("        "); //
   }
   else
@@ -2030,6 +2069,13 @@ void setup()
 
   lcd.init();      // Inicialitzem lcd
   lcd.backlight(); // Arrenquem la llum de fons lcd
+  // Creem els icons de
+  lcd.createChar(0,baticon[0]); //0%
+  lcd.createChar(1,baticon[1]); //20%
+  lcd.createChar(2,baticon[2]); //40%
+  lcd.createChar(3,baticon[3]); //60%
+  lcd.createChar(4,baticon[4]); //80%
+  lcd.createChar(5,baticon[5]); //100%
   lcd.clear();     // Esborrem la pantalla
 
   Serial.println();
@@ -2129,6 +2175,8 @@ void setup()
   llum.clear();
   lcd.clear();
   escriure_display_1(funcio_local + 1);
+  llegir_bateria(); // Mirem la bateria
+  mostrar_bat(); // Dibuixem nivell bateria
   last_time_roig = millis(); // Debouncer polsador
   last_time_verd = millis(); // Debouncer polsador
   LOCAL_CHANGE = false;
@@ -2180,5 +2228,15 @@ void loop()
     lastEventTime = millis();
     comunicar_clock();
     // ORIGINAL: esp_now_send(NULL, (uint8_t *)&outgoingSetpoints, sizeof(outgoingSetpoints)); // Envia valors master
+  }
+
+  // Llegim bateria cada interval
+  if ((millis() - ultima_lectura_bat) > interval_lectura_bat)
+  {
+    llegir_bateria();
+    mostrar_bat();
+    ultima_lectura_bat = millis();
+    // CAL DIBUIXAR INTERFACE WEB AMB VALOR
+    
   }
 }
