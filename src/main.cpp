@@ -2315,6 +2315,5 @@ void loop()
     mostrar_bat();
     ultima_lectura_bat = millis();
     web_bateria_local(); //Forcem escriptura al web
-    
   }
 }
