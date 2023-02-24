@@ -534,7 +534,7 @@ void comunicar_slaves()
   toSlave.msgType = TALLY;
   for (int i = 0; i < 3; i++)
   {
-    toSlave.led_roig[i] = led_roig[i]; // Li pasem array complert
+    toSlave.led_roig[i] = led_roig[i]; // Li pasem array complert de leds
     toSlave.led_verd[i] = led_verd[i]; // Idem 3 valors LLUM, COND i PROD
     switch (ModeColor)
     {
@@ -545,7 +545,7 @@ void comunicar_slaves()
       toSlave.color_tally[i] = color_matrix[1][i]; // Versio Color secundari
       break;
     }
-    toSlave.text_2[i] = display_text_2[i];
+    toSlave.text_2[i] = display_text_2[i]; // Li pasem el array complert text
   }
 
   // Send message via ESP-NOW
@@ -1885,6 +1885,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
   Serial.print(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success to " : "Delivery Fail to ");
   printMAC(mac_addr);
   Serial.println();
+  // Si fallen envios podriem mostrar en WEB?
 }
 // Quan rebem un comunicació
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
@@ -1981,6 +1982,9 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
           Serial.println("send response");
           esp_err_t result = esp_now_send(mac_addr, (uint8_t *)&pairingData, sizeof(pairingData)); // Respon al emissor
           addPeer(mac_addr);
+          // Aqui podriem enviar info de la llum i info del clock
+          // comunicar_slaves();  // Comuniquem llum
+          // comunicar_clock();   // Comuniquem clock
         }
       }
       break;
@@ -1990,8 +1994,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
 // Menu configuracio
 void Menu_configuracio()
 {
-  // local_text_1 = 4; //CONFIG
-  // local_text_2 = 18; //MODE TALLY
   int select[] = {18, 19, 20}; // Array amb les opcions de config
   int sel = 0;
   escriure_display_1(4);
