@@ -2249,8 +2249,12 @@ void setup()
   {
     GPEXTA.pinMode(p, OUTPUT);
   }
-
+  
+  // Atencio al canvi d'hora US ho fa abans que UK
+  //# const char* TZ_INFO = “GMT+0BST-1,M3.5.0/01:00:00,M10.5.0/02:00:00”;
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  //# setenv("TZ",TZ_INFO,1);
+  //# tzset();
   llum.clear();
   lcd.clear();
   escriure_display_1(funcio_local + 1);
