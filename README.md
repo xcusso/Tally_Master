@@ -208,13 +208,18 @@ Pins del D15 - CONNECTOR SUPERIOR
 14 - Input 4
 15 - Input 2
 
-
-
 Podriem instal.lar un heartbeat per comprovar que la linea és operativa.
 
-Que podria fer: 
-El master es connecta a internet i ofereix el temps real al display.
-Cada posició pot tenir un numero indicant la posició de la taula. El numero canvi de color.
+Connexionat:
+Els dos PCF8575 i el display estan connectats al SCL G22 i SDA G33
+El polsador Roig esta al G16 i el led roig al G17
+El polsador Verd esta al G5 i el led verd al G18
+El matrix led al G4
+El sensor de baterioa esta al G36 (marcat com SP) a través de dos diodes per
+fer una caiguda de tensió de 1V
+Els matrix led van connectats a 5v directe de bateria
+
+
 
 Modul Master:
 
