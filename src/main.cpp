@@ -1795,7 +1795,7 @@ void llegir_gpi()
   {
     if (PORT_A == "VIA")
     {
-      GPIA[1][i] = GPEXTA.digitalRead(i);
+      GPIA[1][i] = !GPEXTA.digitalRead(i);
       if (GPIA[0][i] != GPIA[1][i])
       {
         // GPI CANVIAT
@@ -1820,7 +1820,7 @@ void llegir_gpi()
     if (PORT_B == "QL") // QL va amb PULLUP Logica inversa
     {
       // GPIX[1] => Actual  GPIX[0] => Anterior
-      GPIB[1][i] = GPEXTB.digitalRead(i);
+      GPIB[1][i] = !GPEXTB.digitalRead(i);
       if (GPIB[0][i] != GPIB[1][i])
       {
         // GPI CANVIAT
