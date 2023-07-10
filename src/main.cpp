@@ -980,8 +980,9 @@ void logica_gpi()
   /*
     VIA:
     GPO 0 -> LLUM
-    GPO 3 -> CONECTAT
-
+    NO GPO 3 -> CONECTAT
+    GPO 4 -> CONECTAT (el GPO 4) vé de la massa del connector 13 del VIA, l'entrada esta en PULLUP si detecta un 0 es que esta conectada
+    El 13 de la QL és 5V per tant si s'intercanvien els cables no detectarà el via
     QL:
     GPO 0: MIC COND ON
     GPO 1: Confirmació COND Ordres Productor (vermell)

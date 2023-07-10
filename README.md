@@ -172,7 +172,7 @@ Si només tenim el bit 1A (VIA) i no el bit 1B (QL) encendrem el tally TARONJA. 
 Si només tenim el bit 1B (QL) i no tenim el bit 1A (VIA) encendrem el tally GROC. (ESPERANT ESTUDI).
 Si no tenim cap bit 1A ni 1B el tally queda apagat.
 
-GPIO del VIA:
+GPIO del VIA: Connector inferior
 
 Disposem de 5 GPI i 5 GPO del VIA.
 
@@ -191,7 +191,7 @@ Bit 2 - Lliure
 Bit 3 - lliure
 Bit 4 - Lliure
 
-Pins del D15
+Pins del D15 - CONNECTOR SUPERIOR
 1 - ground
 2 - Out 4 
 3 - Out 3
