@@ -993,7 +993,7 @@ void logica_gpi()
   */
 
   { // TENIM VIA I QL CONNECTATS
-    if (GPIA[0][3] && GPIB[0][5])
+    if (GPIA[0][4] && GPIB[0][5])
     {
       if ((GPIB[0][1] && (GPIB[0][2] || GPIB[0][3] || GPIB[0][4])) ||
           (GPIB[0][2] && (GPIB[0][1] || GPIB[0][3] || GPIB[0][4])) ||
@@ -1458,7 +1458,7 @@ void logica_gpi()
       }
     }
 
-    if (!GPIA[0][3] && GPIB[0][5])
+    if (!GPIA[0][4] && GPIB[0][5])
     {
       if ((GPIB[0][1] && (GPIB[0][2] || GPIB[0][3] || GPIB[0][4])) ||
           (GPIB[0][2] && (GPIB[0][1] || GPIB[0][3] || GPIB[0][4])) ||
@@ -1705,7 +1705,7 @@ void logica_gpi()
       }
     }
 
-    if (GPIA[0][3] && !GPIB[0][5])
+    if (GPIA[0][4] && !GPIB[0][5])
     {
       // Presencia de VIA PERO NO DE QL ========================================
       if (GPIA[0][0])
@@ -1758,7 +1758,7 @@ void logica_gpi()
       }
     }
 
-    if (!GPIA[0][3] && !GPIB[0][5])
+    if (!GPIA[0][4] && !GPIB[0][5])
     {
       display_text_2[0] = 1; // " FORA DE SERVEI ", //1
       display_text_2[1] = 1; // " FORA DE SERVEI ", //1
