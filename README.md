@@ -9,7 +9,7 @@ Crear tallys (pilots vermells ON AIR) inhalambrics multiproposit.
 
 Es defineixen dos tipus de dispositius: Master i Slave
 
-Dispositiu Master: va connectat als GPIO de ls equips i s'encarrega de connectar amb els slave de forma inhalambrica.
+Dispositiu Master: va connectat als GPIO dels equips i s'encarrega de connectar amb els slave de forma inhalambrica.
 Dispositiu Slave: estan enllaçats inhalambricament amb el master. 
 
 Tant el modul Master com Slave es poden configurar com a TALLY, CONDUCTOR o PRODUCTOR.
@@ -20,7 +20,7 @@ Aquest protocol permet una ràpida connexió utilitzant la banda lliure de 2,4GH
 
 HARDWARE BASE:
 Carcassa de plàstic: Capsa de plàstic impressa en impressora 3D.
-Disseny preliminar: https://www.tinkercad.com/things/fUtyUWNnQUd-cr-tally-box
+Diseny funcional: https://www.tinkercad.com/things/bXiD0YwMSFD
 
 Placa d'alimentació amb dos bateries del tipus 18650 que suministren 3,3V i 5V i fan funcions de càrregà i protecció d'aquestes. Es careguen via conector USB.
 https://www.aliexpress.com/snapshot/0.html?spm=a2g0o.9042647.0.0.6d3763c0rcxVbg&orderId=8145150705073892&productId=1005001854607900
@@ -66,10 +66,11 @@ https://es.aliexpress.com/item/4001296811800.html?gatewayAdapt=glo2esp&spm=a2g0o
 
 Level shifter (per adaptar 3,3v a 5V i inversa):
 https://es.aliexpress.com/item/1005001839292815.html?gatewayAdapt=glo2esp&spm=a2g0o.9042311.0.0.20cd63c0iFG4tf
+En principi no caldrà al utilitzar els expansors PC8575
 
 Modul expansor GPIO PCF8575:
 https://es.aliexpress.com/item/4000981520132.html
-Fa faltar PULL UP externs.
+Fa faltar PULL UP externs. Hem posat pull-ups per resistencia Arry 10K a les entrades del modul que va amb el VIA. En principi la taula QL genera els nivells de forma correcta (caldrà provar-ho).
 
 MASTER:
 El controlador master serà l'encarregat d'intercactuar mitjançant GPIO d'entrada i sortida amb senyals externes provinents de la taula de só local i dels estudis centrals, i al mateix temps enviar GPO per activar funcions de la taula local o senyalitzacions als estudis centrals.  
@@ -79,12 +80,12 @@ Utilitzant el level shifter podem generar un bit per determinar si tenim connect
 
 En el cas dels equips VIA, tan sols tenen quatre GPIO i el seu funcionament és una mica diferent al standart.
 Sortides: El via subministra 4 contactes que internament obre i tanca com si fossin reles (relé d'estat sólid).
-Les entrades detecta mitjançant contacte a terra o circuit obert. (S'han posat transistors per adaptar les sortides del Esp32.) cal verificar si es poden utilitzar directament les plaques PCF8575
+Les entrades detecta mitjançant contacte a terra o circuit obert. Cal verificar si es poden utilitzar directament les plaques PCF8575
 
 De moment sense us (S'han col.locat el transistor estandart 2N2222. La sortida del ESp32 passa a una resistencia de 1k i va a la base del transistor. 
 L'emissor està conectat a terra i el colector al pin del VIA.)
 
-Utilitzarem el OUTPUT 1 del VIA per donar la senyal ON AIR, el OUTPUT 4 per donar senyal de forma constant que està conectat al VIA.
+Utilitzarem el OUTPUT 1 del VIA per donar la senyal ON AIR. S'ha inclós el 
 El bit del OUTPUT 1 vindrà del control central, el OUTPUT 4 ha d'estar a terra OFF. D'aquesta manera (al estar connectat en PULL UP) sabrem si tenim el VIA connectat o no.
 
 
@@ -180,14 +181,33 @@ GPIO OUT VIA
 Bit 1 - Canal obert
 Bit 2 - Lliure
 Bit 3 - LLiure
-Bit 4 - Connexió del equip. El ESp32 esta en PULL UP, si no hi ha el cable detectara un 1 els 4 bits.
+Bit 4 - lliure
+Fem servir la masa del 13 perd etectactar la connexió del equip. El PCF8578 esta en PULL UP, si no hi ha el cable detectara un 1.
 
 
 GPIO IN VIA
 Bit 1 - Lliure Disponible per fer invents de heartbeat.
-Bit 2 - DISPONIBLE AMB NOVA VERSIO Lliure NO DISPONIBLE PER FALTA DE GPIO DEL ESP32
-Bit 3 - DISPONIBLE AMB NOVA VERSIO  LLiure NO DISPONIBLE PER FALTA DE GPIO DEL ESP32
-Bit 4 - DISPONIBLE AMB NOVA VERSIO Lliure NO DISPONIBLE PER FALTA DE GPIO DEL ESP32
+Bit 2 - Lliure
+Bit 3 - lliure
+Bit 4 - Lliure
+
+Pins del D15
+1 - ground
+2 - Out 4 
+3 - Out 3
+4 - Out 2
+5 - Out 1
+6 - ground a GND de PCF8578
+7 - Input 3
+8 - Input 1
+9 - Conectat a 1 ground
+10 - Connectat a 1 ground
+11 - Connectat a 1 ground
+12 - Connetat a 1 Ground
+13 - Conectat a input 5 del PCF8578 en pullip per detectar presencia del VIA.
+14 - Input 4
+15 - Input 2
+
 
 
 Podriem instal.lar un heartbeat per comprovar que la linea és operativa.
